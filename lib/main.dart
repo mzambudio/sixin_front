@@ -4,9 +4,10 @@ import 'screens/screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ThemeController.instance.loadFromPrefs();
+  await ThemeController.instance.load();
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
