@@ -77,9 +77,13 @@ class _LoginScreenState extends State<LoginScreen> {
     /// THEME SHORTCUTS
     /// ───────────────
     final bg = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.95);
-    final hintColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
+    final textColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.95);
+    final hintColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
     final primary = Theme.of(context).colorScheme.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoAsset = isDark
+        ? 'assets/images/sixin_white.png'
+        : 'assets/images/sixin_black.png';
 
     return Scaffold(
       backgroundColor: bg,
@@ -110,10 +114,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 /// ───────────────
                 /// LOGO & TITLE
                 /// ───────────────
-                const FlutterLogo(size: 86),
+                Image(
+                  image: AssetImage(logoAsset),
+                  height: 180,
+                ),
                 const SizedBox(height: 26),
                 Text(
-                  'Bienvenido',
+                  'SixIn',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,
