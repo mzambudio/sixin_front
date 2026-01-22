@@ -1,6 +1,6 @@
 {
-    "name": "block_out_front",
-    "short_name": "block_out_front",
+    "name": "sixin_front",
+    "short_name": "sixin_front",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

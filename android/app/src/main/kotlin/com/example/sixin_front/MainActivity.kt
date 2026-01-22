@@ -1,4 +1,4 @@
-package com.example.block_out_front
+package com.example.sixin_front
 
 import io.flutter.embedding.android.FlutterActivity
 
