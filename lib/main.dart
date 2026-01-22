@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
       builder: (context, theme, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'App',
+          title: 'SixIn',
           theme: theme,
           routes: {
             '/': (_) => const LoginScreen(),
