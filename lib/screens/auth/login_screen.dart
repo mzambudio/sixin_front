@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common/theme_editor.dart';
+import '../screens.dart';
 
 /// ─────────────────────────────────────────────
 /// LOGIN SCREEN (STATEFUL WIDGET)
@@ -54,7 +55,12 @@ class _LoginScreenState extends State<LoginScreen> {
     Future.delayed(const Duration(milliseconds: 400), () {
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(isGuest: false),
+        ), // Acceso completo
+      );
     });
   }
 
@@ -77,8 +83,12 @@ class _LoginScreenState extends State<LoginScreen> {
     /// THEME SHORTCUTS
     /// ───────────────
     final bg = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.95);
-    final hintColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+    final textColor = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.95);
+    final hintColor = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.7);
     final primary = Theme.of(context).colorScheme.primary;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
@@ -114,10 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 /// ───────────────
                 /// LOGO & TITLE
                 /// ───────────────
-                Image(
-                  image: AssetImage(logoAsset),
-                  height: 180,
-                ),
+                Image(image: AssetImage(logoAsset), height: 180),
                 const SizedBox(height: 26),
                 Text(
                   'SixIn',
@@ -266,7 +273,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () {
-                            Navigator.pushReplacementNamed(context, '/home');
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HomeScreen(isGuest: true),
+                              ),
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
