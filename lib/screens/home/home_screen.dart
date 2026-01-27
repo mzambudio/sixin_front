@@ -1,144 +1,114 @@
 import 'package:flutter/material.dart';
-import '../../widgets/common/theme_editor.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({
-    super.key,
-    this.isGuest = false,
-  });
-
+class HomeScreen extends StatelessWidget {
   final bool isGuest;
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-
-  /// ───────────────
-  /// TABS
-  /// ───────────────
-  final List<Widget> _tabs = const [
-    _HomeTab(),
-    _MatchTab(),
-    _ProfileTab(),
-  ];
+  const HomeScreen({super.key, required this.isGuest});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = Theme.of(context).colorScheme.onSurface;
+    final theme = Theme.of(context);
+    final textColor = theme.colorScheme.onSurface;
+    final primary = theme.colorScheme.primary;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('SixIn'),
         actions: [
-          IconButton(
-            tooltip: 'Editar tema',
-            icon: const Icon(Icons.palette),
-            onPressed: () => ThemeEditor.show(context),
-          ),
-        ],
-      ),
-
-      /// ───────────────
-      /// BODY
-      /// ───────────────
-      body: Column(
-        children: [
-          /// Guest banner
-          if (widget.isGuest)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: isDark ? Colors.orange.shade900 : Colors.orange.shade100,
-              child: const Text(
-                'Estás navegando como invitado',
-                textAlign: TextAlign.center,
-              ),
+          if (!isGuest)
+            IconButton(
+              tooltip: 'Cerrar sesión',
+              icon: const Icon(Icons.logout),
+              onPressed: () {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/',
+                  (route) => false,
+                );
+              },
             ),
-
-          /// Active tab
-          Expanded(
-            child: _tabs[_currentIndex],
-          ),
         ],
       ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              /// ───────────────
+              /// WELCOME
+              /// ───────────────
+              Text(
+                isGuest ? 'Bienvenido, invitado' : 'Bienvenido a SixIn',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
 
-      /// ───────────────
-      /// BOTTOM NAV
-      /// ───────────────
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Inicio',
+              const SizedBox(height: 12),
+
+              Text(
+                isGuest
+                    ? 'Estás usando la app en modo invitado. Algunas funciones estarán limitadas.'
+                    : 'Has iniciado sesión correctamente.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: textColor.withOpacity(0.8),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              /// ───────────────
+              /// MAIN CONTENT PLACEHOLDER
+              /// ───────────────
+              Expanded(
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    'Contenido principal\n(próximamente)',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: textColor.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              /// ───────────────
+              /// GUEST CTA
+              /// ───────────────
+              if (isGuest)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/',
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Iniciar sesión para desbloquear todo',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
-            label: 'Match',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Perfil',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// HOME TAB
-/// ─────────────────────────────────────────────
-class _HomeTab extends StatelessWidget {
-  const _HomeTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Home',
-        style: TextStyle(fontSize: 24),
-      ),
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// MATCH TAB
-/// ─────────────────────────────────────────────
-class _MatchTab extends StatelessWidget {
-  const _MatchTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Match',
-        style: TextStyle(fontSize: 24),
-      ),
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// PROFILE TAB
-/// ─────────────────────────────────────────────
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Perfil',
-        style: TextStyle(fontSize: 24),
+        ),
       ),
     );
   }
