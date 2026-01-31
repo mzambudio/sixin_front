@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
+import '../screens.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
 
-  const HomeScreen({
-    super.key,
-    required this.isGuest,
-  });
+  const HomeScreen({super.key, required this.isGuest});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,10 +17,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: widget.isGuest ? 1 : 2,
-      vsync: this,
-    );
+    _tabController = TabController(length: widget.isGuest ? 1 : 2, vsync: this);
   }
 
   @override
@@ -44,11 +39,7 @@ class _HomeScreenState extends State<HomeScreen>
             tooltip: isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
             icon: Icon(isGuest ? Icons.login : Icons.logout),
             onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/',
-                (route) => false,
-              );
+              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
             },
           ),
         ],
@@ -100,6 +91,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
+/// ───────────────
+/// LISTAS PÚBLICAS
+/// ───────────────
 class _PublicListsTab extends StatelessWidget {
   final bool isGuest;
 
@@ -119,12 +113,12 @@ class _PublicListsTab extends StatelessWidget {
                 ? const Icon(Icons.visibility)
                 : const Icon(Icons.group_add),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    isGuest
-                        ? 'Vista solo lectura'
-                        : 'Unirse a lista (no implementado)',
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ListDetailScreen(
+                    title: 'Lista pública ${index + 1}',
+                    isGuest: isGuest,
                   ),
                 ),
               );
@@ -136,6 +130,9 @@ class _PublicListsTab extends StatelessWidget {
   }
 }
 
+/// ───────────────
+/// MIS LISTAS
+/// ───────────────
 class _MyListsTab extends StatelessWidget {
   const _MyListsTab();
 
@@ -151,9 +148,11 @@ class _MyListsTab extends StatelessWidget {
             subtitle: const Text('Participantes: 4'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Detalle de lista (no implementado)'),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const ListDetailScreen(title: 'Mi lista', isGuest: false),
                 ),
               );
             },
