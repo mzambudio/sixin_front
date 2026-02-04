@@ -54,9 +54,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyD3jgCjMJa3Q1vR0c2cmAU2tgL-JWPZr_E',
-    appId: '1:853873498032:android:7f49398065dcbce7a82875',
+    appId: '1:853873498032:android:fe9bb5eeb9517463a82875',
     messagingSenderId: '853873498032',
     projectId: 'sixin-a822c',
     storageBucket: 'sixin-a822c.firebasestorage.app',
   );
+
 }

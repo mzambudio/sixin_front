@@ -23,6 +23,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853873498032:android:fe9bb5eeb9517463a82875",
+        "android_client_info": {
+          "package_name": "com.mzambudiodev.sixin_front"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3jgCjMJa3Q1vR0c2cmAU2tgL-JWPZr_E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
