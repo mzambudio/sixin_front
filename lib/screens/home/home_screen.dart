@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens.dart';
+import '../../models/models.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
@@ -13,6 +14,31 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final List<SixinList> _publicLists = [
+    SixinList(
+      id: '1',
+      title: 'Lista pública 1',
+      ownerName: 'Usuario A',
+      isPublic: true,
+      items: [],
+    ),
+    SixinList(
+      id: '2',
+      title: 'Lista pública 2',
+      ownerName: 'Usuario B',
+      isPublic: true,
+      items: [],
+    ),
+  ];
+  final List<SixinList> _myLists = [
+    SixinList(
+      id: '3',
+      title: 'Mi lista 1',
+      ownerName: 'Yo',
+      isPublic: false,
+      items: [],
+    ),
+  ];
 
   @override
   void initState() {
@@ -58,8 +84,8 @@ class _HomeScreenState extends State<HomeScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _PublicListsTab(isGuest: isGuest),
-          if (!isGuest) const _MyListsTab(),
+          _PublicListsTab(lists: _publicLists, isGuest: isGuest),
+          if (!isGuest) _MyListsTab(lists: _myLists),
         ],
       ),
 
@@ -96,19 +122,21 @@ class _HomeScreenState extends State<HomeScreen>
 /// ───────────────
 class _PublicListsTab extends StatelessWidget {
   final bool isGuest;
+  final List<SixinList> lists;
 
-  const _PublicListsTab({required this.isGuest});
+  const _PublicListsTab({required this.isGuest, required this.lists});
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: 6,
+      itemCount: lists.length,
       itemBuilder: (context, index) {
+        final list = lists[index];
         return Card(
           child: ListTile(
-            title: Text('Lista pública ${index + 1}'),
-            subtitle: const Text('Creada por un usuario'),
+            title: Text(list.title),
+            subtitle: Text('Creada por ${list.ownerName}'),
             trailing: isGuest
                 ? const Icon(Icons.visibility)
                 : const Icon(Icons.group_add),
@@ -116,10 +144,8 @@ class _PublicListsTab extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ListDetailScreen(
-                    title: 'Lista pública ${index + 1}',
-                    isGuest: isGuest,
-                  ),
+                  builder: (_) =>
+                      ListDetailScreen(list: list, isGuest: isGuest),
                 ),
               );
             },
@@ -134,25 +160,28 @@ class _PublicListsTab extends StatelessWidget {
 /// MIS LISTAS
 /// ───────────────
 class _MyListsTab extends StatelessWidget {
-  const _MyListsTab();
+  final List<SixinList> lists;
+
+  const _MyListsTab({required this.lists});
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: 3,
+      itemCount: lists.length,
       itemBuilder: (context, index) {
+        final list = lists[index];
         return Card(
           child: ListTile(
-            title: Text('Mi lista ${index + 1}'),
-            subtitle: const Text('Participantes: 4'),
+            title: Text(list.title),
+            subtitle: Text('Participantes: ${list.items.length}'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      const ListDetailScreen(title: 'Mi lista', isGuest: false),
+                      ListDetailScreen(list: list, isGuest: false),
                 ),
               );
             },

@@ -150,6 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       /// ───────────────
                       TextFormField(
                         controller: _emailCtrl,
+                        autofillHints: null,
                         keyboardType: TextInputType.emailAddress,
                         style: TextStyle(color: textColor),
                         validator: _validateEmail,

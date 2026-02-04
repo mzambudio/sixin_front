@@ -1,113 +1,92 @@
 import 'package:flutter/material.dart';
+import '../../models/models.dart';
 
 class ListDetailScreen extends StatelessWidget {
-  final String title;
+  final SixinList list;
   final bool isGuest;
 
   const ListDetailScreen({
     super.key,
-    required this.title,
+    required this.list,
     required this.isGuest,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(list.title),
         actions: [
-          IconButton(
-            tooltip: isGuest ? 'Vista solo lectura' : 'Gestionar lista',
-            icon: Icon(isGuest ? Icons.visibility : Icons.settings),
-            onPressed: isGuest
-                ? null
-                : () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Gestión de lista (no implementado)'),
-                      ),
-                    );
-                  },
-          ),
+          if (!isGuest)
+            IconButton(
+              tooltip: 'Editar lista',
+              icon: const Icon(Icons.edit),
+              onPressed: () {
+                // futuro: editar lista
+              },
+            ),
         ],
       ),
 
-      /// ───────────────
-      /// BODY
-      /// ───────────────
-      body: _ListItems(isGuest: isGuest),
-
-      /// ───────────────
-      /// ACTION BUTTON
-      /// ───────────────
-      floatingActionButton: FloatingActionButton(
-        tooltip:
-            isGuest ? 'Inicia sesión para añadir items' : 'Añadir item',
-        onPressed: isGuest
-            ? () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Debes iniciar sesión para modificar la lista'),
-                  ),
-                );
-              }
-            : () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Añadir item (no implementado)'),
-                  ),
-                );
-              },
-        child: Icon(isGuest ? Icons.lock : Icons.add),
+      body: _ListItemsView(
+        items: list.items,
+        isGuest: isGuest,
       ),
+
+      floatingActionButton: isGuest
+          ? null
+          : FloatingActionButton(
+              tooltip: 'Añadir item',
+              child: const Icon(Icons.add),
+              onPressed: () {
+                // futuro: añadir item
+              },
+            ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────
-/// LIST ITEMS
-/// ─────────────────────────────────────────────
-class _ListItems extends StatelessWidget {
+class _ListItemsView extends StatelessWidget {
+  final List<SixinListItem> items;
   final bool isGuest;
 
-  const _ListItems({required this.isGuest});
+  const _ListItemsView({
+    required this.items,
+    required this.isGuest,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Datos fake
-    final items = List.generate(5, (i) => 'Elemento ${i + 1}');
-
     if (items.isEmpty) {
-      return const Center(
-        child: Text('Esta lista está vacía'),
+      return Center(
+        child: Text(
+          isGuest
+              ? 'Esta lista no tiene elementos'
+              : 'Empieza añadiendo un elemento',
+        ),
       );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const Divider(),
       itemBuilder: (context, index) {
-        return Card(
-          child: ListTile(
-            title: Text(items[index]),
-            trailing: isGuest
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text('Eliminar item (no implementado)'),
-                        ),
-                      );
-                    },
-                  ),
+        final item = items[index];
+
+        return ListTile(
+          title: Text(item.title),
+          leading: Icon(
+            item.completed ? Icons.check_circle : Icons.circle_outlined,
           ),
+          trailing: isGuest
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () {
+                    // futuro: borrar item
+                  },
+                ),
         );
       },
     );
