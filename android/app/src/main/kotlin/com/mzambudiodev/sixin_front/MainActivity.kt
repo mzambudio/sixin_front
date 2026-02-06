@@ -1,4 +1,4 @@
-package com.example.sixin_front
+package com.mzambudiodev.sixin_front
 
 import io.flutter.embedding.android.FlutterActivity
 
