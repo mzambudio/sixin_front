@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens.dart';
 import '../../models/models.dart';
+import '../../core/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
@@ -64,8 +65,23 @@ class _HomeScreenState extends State<HomeScreen>
           IconButton(
             tooltip: isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
             icon: Icon(isGuest ? Icons.login : Icons.logout),
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            onPressed: () async {
+              try {
+                if (isGuest) {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/',
+                    (route) => false,
+                  );
+                } else {
+                  await AuthService.instance.signOut();
+                }
+              } catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No se pudo cerrar sesión.')),
+                );
+              }
             },
           ),
         ],
@@ -180,8 +196,7 @@ class _MyListsTab extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) =>
-                      ListDetailScreen(list: list, isGuest: false),
+                  builder: (_) => ListDetailScreen(list: list, isGuest: false),
                 ),
               );
             },

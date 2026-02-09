@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common/theme_editor.dart';
 import '../screens.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/auth_service.dart';
 
 /// ─────────────────────────────────────────────
 /// LOGIN SCREEN (STATEFUL WIDGET)
@@ -47,21 +49,41 @@ class _LoginScreenState extends State<LoginScreen> {
   /// ───────────────
   /// SUBMIT / LOGIN ACTION
   /// ───────────────
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
 
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(isGuest: false),
-        ), // Acceso completo
+    try {
+      await AuthService.instance.signInWithEmail(
+        _emailCtrl.text,
+        _passCtrl.text,
       );
-    });
+      if (!mounted) return;
+    } on FirebaseAuthException catch (e) {
+      final msg = switch (e.code) {
+        'user-not-found' => 'No existe una cuenta con ese correo.',
+        'wrong-password' => 'Contraseña incorrecta.',
+        'invalid-email' => 'El correo no es válido.',
+        'user-disabled' => 'Esta cuenta está deshabilitada.',
+        'too-many-requests' => 'Demasiados intentos. Prueba más tarde.',
+        _ => 'Error al iniciar sesión (${e.code}).',
+      };
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error inesperado al iniciar sesión.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   /// ───────────────
@@ -308,15 +330,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(color: hintColor),
                           ),
                           TextButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Registro no implementado en demo',
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: () => Navigator.pushNamed(context, '/register'),
                             child: Text(
                               'Regístrate',
                               style: TextStyle(color: primary),

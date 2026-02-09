@@ -26,13 +26,14 @@ class MyApp extends StatelessWidget {
       builder: (context, theme, _) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'SixIn',
+          title: 'Sixin',
           theme: theme,
           initialRoute: '/',
           routes: {
-            '/': (_) => const LoginScreen(),
+            '/': (_) => const AuthGate(),
             '/forgot': (_) => const ForgotPasswordScreen(),
             '/reset': (_) => const ResetPasswordScreen(),
+            '/register': (_) => const RegisterScreen(),
           },
         );
       },
