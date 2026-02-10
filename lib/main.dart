@@ -34,6 +34,8 @@ class MyApp extends StatelessWidget {
             '/forgot': (_) => const ForgotPasswordScreen(),
             '/reset': (_) => const ResetPasswordScreen(),
             '/register': (_) => const RegisterScreen(),
+            '/profile': (_) => const ProfileScreen(),
+            '/edit-profile': (_) => const EditProfileScreen(),
           },
         );
       },

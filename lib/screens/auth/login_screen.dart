@@ -149,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Image(image: AssetImage(logoAsset), height: 180),
                 const SizedBox(height: 26),
                 Text(
-                  'SixIn',
+                  'Sixin',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,

@@ -60,8 +60,16 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SixIn'),
+        title: const Text('Sixin'),
         actions: [
+          if (!isGuest)
+            IconButton(
+              tooltip: 'Perfil',
+              icon: const Icon(Icons.person),
+              onPressed: () {
+                Navigator.pushNamed(context, '/profile');
+              },
+            ),
           IconButton(
             tooltip: isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
             icon: Icon(isGuest ? Icons.login : Icons.logout),
@@ -85,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         ],
+
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -95,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
 
       /// ───────────────
-      /// BODY
+      /// BODY - TAB VIEWS
       /// ───────────────
       body: TabBarView(
         controller: _tabController,
@@ -106,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
 
       /// ───────────────
-      /// ACTION BUTTON
+      /// ACTION BUTTON - CREAR LISTA
       /// ───────────────
       floatingActionButton: FloatingActionButton(
         onPressed: isGuest
