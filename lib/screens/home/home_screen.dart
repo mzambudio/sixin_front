@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../screens.dart';
 import '../../models/models.dart';
-import '../../core/services/auth_service.dart';
+import '../../core/services/services.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
@@ -57,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isGuest = widget.isGuest;
+    final authUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -109,8 +112,8 @@ class _HomeScreenState extends State<HomeScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _PublicListsTab(lists: _publicLists, isGuest: isGuest),
-          if (!isGuest) _MyListsTab(lists: _myLists),
+          _PublicListsTab(isGuest: isGuest),
+          if (!isGuest) _MyListsTab(uid: authUser?.uid ?? ''),
         ],
       ),
 
@@ -128,8 +131,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _createList(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Crear lista (no implementado aún)')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateListScreen()),
     );
   }
 
@@ -147,34 +151,107 @@ class _HomeScreenState extends State<HomeScreen>
 /// ───────────────
 class _PublicListsTab extends StatelessWidget {
   final bool isGuest;
-  final List<SixinList> lists;
-
-  const _PublicListsTab({required this.isGuest, required this.lists});
+  const _PublicListsTab({required this.isGuest});
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: lists.length,
-      itemBuilder: (context, index) {
-        final list = lists[index];
-        return Card(
-          child: ListTile(
-            title: Text(list.title),
-            subtitle: Text('Creada por ${list.ownerName}'),
-            trailing: isGuest
-                ? const Icon(Icons.visibility)
-                : const Icon(Icons.group_add),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      ListDetailScreen(list: list, isGuest: isGuest),
-                ),
-              );
-            },
-          ),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: ListService.instance.watchPublicLists(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Center(child: Text('Error: ${snap.error}'));
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('No hay listas públicas'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final d = docs[i];
+            final data = d.data();
+
+            final title = (data['title'] ?? '(sin título)') as String;
+            final owner = (data['ownerUsername'] ?? '—') as String;
+
+            final list = SixinList(
+              id: d.id,
+              title: title,
+              ownerName: owner,
+              isPublic: true,
+              items: const [], // de momento
+            );
+
+            final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
+
+            return Card(
+              child: ListTile(
+                title: Text(list.title),
+                subtitle: Text('Creada por ${list.ownerName}'),
+                trailing: isGuest
+                    ? const Icon(Icons.visibility)
+                    : TextButton(
+                        onPressed: () async {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null) return;
+
+                          try {
+                            if (joinPolicy == 'open') {
+                              await ListService.instance.joinList(
+                                listId: d.id,
+                                uid: user.uid,
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Te has unido ✅'),
+                                  ),
+                                );
+                              }
+                            } else {
+                              await ListService.instance.requestJoin(
+                                listId: d.id,
+                                uid: user.uid,
+                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Solicitud enviada ✅'),
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
+                        child: Text(
+                          joinPolicy == 'open' ? 'Unirse' : 'Solicitar',
+                        ),
+                      ),
+
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ListDetailScreen(list: list, isGuest: isGuest),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );
@@ -185,31 +262,62 @@ class _PublicListsTab extends StatelessWidget {
 /// MIS LISTAS
 /// ───────────────
 class _MyListsTab extends StatelessWidget {
-  final List<SixinList> lists;
+  final String uid;
 
-  const _MyListsTab({required this.lists});
+  const _MyListsTab({required this.uid});
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: lists.length,
-      itemBuilder: (context, index) {
-        final list = lists[index];
-        return Card(
-          child: ListTile(
-            title: Text(list.title),
-            subtitle: Text('Participantes: ${list.items.length}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ListDetailScreen(list: list, isGuest: false),
-                ),
-              );
-            },
-          ),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: ListService.instance.watchMyLists(uid),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Center(child: Text('Error: ${snap.error}'));
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('Aún no estás en ninguna lista'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final d = docs[i];
+            final data = d.data();
+
+            final title = (data['title'] ?? '(sin título)') as String;
+            final owner = (data['ownerUsername'] ?? '—') as String;
+
+            final list = SixinList(
+              id: d.id,
+              title: title,
+              ownerName: owner,
+              isPublic: (data['visibility'] == 'public'),
+              items: const [],
+            );
+
+            return Card(
+              child: ListTile(
+                title: Text(list.title),
+                subtitle: Text('Creada por ${list.ownerName}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ListDetailScreen(list: list, isGuest: false),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );

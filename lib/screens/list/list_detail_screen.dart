@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ListDetailScreen extends StatelessWidget {
   final SixinList list;
@@ -28,10 +29,7 @@ class ListDetailScreen extends StatelessWidget {
         ],
       ),
 
-      body: _ListItemsView(
-        items: list.items,
-        isGuest: isGuest,
-      ),
+      body: _MembersView(listId: list.id),
 
       floatingActionButton: isGuest
           ? null
@@ -46,47 +44,46 @@ class ListDetailScreen extends StatelessWidget {
   }
 }
 
-class _ListItemsView extends StatelessWidget {
-  final List<SixinListItem> items;
-  final bool isGuest;
-
-  const _ListItemsView({
-    required this.items,
-    required this.isGuest,
-  });
+class _MembersView extends StatelessWidget {
+  final String listId;
+  const _MembersView({required this.listId});
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          isGuest
-              ? 'Esta lista no tiene elementos'
-              : 'Empieza añadiendo un elemento',
-        ),
-      );
-    }
+    final membersStream = FirebaseFirestore.instance
+        .collection('lists')
+        .doc(listId)
+        .collection('members')
+        .snapshots();
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (context, index) {
-        final item = items[index];
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: membersStream,
+      builder: (context, snap) {
+        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-        return ListTile(
-          title: Text(item.title),
-          leading: Icon(
-            item.completed ? Icons.check_circle : Icons.circle_outlined,
-          ),
-          trailing: isGuest
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () {
-                    // futuro: borrar item
-                  },
-                ),
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('Aún no hay miembros'));
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(),
+          itemBuilder: (context, i) {
+            final data = docs[i].data();
+            final username = (data['username'] ?? docs[i].id).toString();
+            final role = (data['role'] ?? 'member').toString();
+
+            return ListTile(
+              leading: const Icon(Icons.person),
+              title: Text(username),
+              subtitle: Text(role),
+            );
+          },
         );
       },
     );

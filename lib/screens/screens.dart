@@ -7,3 +7,4 @@ export 'package:sixin_front/screens/auth/auth_gate.dart';
 export 'package:sixin_front/screens/auth/register_screen.dart';
 export 'package:sixin_front/screens/profile/profile_screen.dart';
 export 'package:sixin_front/screens/profile/edit_profile_screen.dart';
+export 'package:sixin_front/screens/list/create_list_screen.dart';
