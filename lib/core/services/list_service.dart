@@ -146,6 +146,7 @@ class ListService {
   }) async {
     final listRef = _db.collection('lists').doc(listId);
     final reqRef = listRef.collection('requests').doc(uid);
+    final userRef = _db.collection('users').doc(uid);
 
     await _db.runTransaction((tx) async {
       final listSnap = await tx.get(listRef);
@@ -153,17 +154,30 @@ class ListService {
 
       final data = listSnap.data()!;
       final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
+      final memberUidsRaw = data['memberUids'];
+      final memberUids = memberUidsRaw is List
+          ? memberUidsRaw.map((e) => e.toString()).toList()
+          : <String>[];
 
       if (joinPolicy != 'approval') {
         throw Exception('Esta lista es de entrada directa.');
       }
 
+      // ✅ si ya es miembro, no puede pedir
+      if (memberUids.contains(uid)) {
+        throw Exception('Ya perteneces a esta lista.');
+      }
+
       final reqSnap = await tx.get(reqRef);
-      if (reqSnap.exists) return; // ya solicitaste
+      if (reqSnap.exists) return;
+
+      final userSnap = await tx.get(userRef);
+      final username = (userSnap.data()?['username'] ?? uid).toString();
 
       tx.set(reqRef, {
         'requestedAt': FieldValue.serverTimestamp(),
         'status': 'pending',
+        'username': username,
       });
     });
   }
@@ -220,5 +234,17 @@ class ListService {
         .doc(requesterUid);
 
     await reqRef.delete();
+  }
+
+  Future<void> cancelJoinRequest({
+    required String listId,
+    required String uid,
+  }) async {
+    await _db
+        .collection('lists')
+        .doc(listId)
+        .collection('requests')
+        .doc(uid)
+        .delete();
   }
 }

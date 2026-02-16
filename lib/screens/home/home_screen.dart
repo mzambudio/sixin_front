@@ -17,31 +17,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final List<SixinList> _publicLists = [
-    SixinList(
-      id: '1',
-      title: 'Lista pública 1',
-      ownerName: 'Usuario A',
-      isPublic: true,
-      items: [],
-    ),
-    SixinList(
-      id: '2',
-      title: 'Lista pública 2',
-      ownerName: 'Usuario B',
-      isPublic: true,
-      items: [],
-    ),
-  ];
-  final List<SixinList> _myLists = [
-    SixinList(
-      id: '3',
-      title: 'Mi lista 1',
-      ownerName: 'Yo',
-      isPublic: false,
-      items: [],
-    ),
-  ];
 
   @override
   void initState() {
@@ -176,9 +151,15 @@ class _PublicListsTab extends StatelessWidget {
           itemBuilder: (context, i) {
             final d = docs[i];
             final data = d.data();
+            final user = FirebaseAuth.instance.currentUser;
+            final uid = user?.uid;
 
             final title = (data['title'] ?? '(sin título)') as String;
             final owner = (data['ownerUsername'] ?? '—') as String;
+            final membersRaw = data['memberUids'];
+            final memberUids = membersRaw is List
+                ? membersRaw.map((e) => e.toString()).toList()
+                : <String>[];
 
             final list = SixinList(
               id: d.id,
@@ -188,6 +169,8 @@ class _PublicListsTab extends StatelessWidget {
               items: const [], // de momento
             );
 
+            final isMember = uid != null && memberUids.contains(uid);
+
             final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
 
             return Card(
@@ -196,6 +179,11 @@ class _PublicListsTab extends StatelessWidget {
                 subtitle: Text('Creada por ${list.ownerName}'),
                 trailing: isGuest
                     ? const Icon(Icons.visibility)
+                    : isMember
+                    ? const Icon(
+                        Icons.check_circle,
+                        semanticLabel: 'Ya eres miembro',
+                      )
                     : TextButton(
                         onPressed: () async {
                           final user = FirebaseAuth.instance.currentUser;
