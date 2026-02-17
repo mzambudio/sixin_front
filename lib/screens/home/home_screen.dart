@@ -166,7 +166,7 @@ class _PublicListsTab extends StatelessWidget {
               title: title,
               ownerName: owner,
               isPublic: true,
-              items: const [], // de momento
+              items: const [],
             );
 
             final isMember = uid != null && memberUids.contains(uid);
@@ -184,36 +184,22 @@ class _PublicListsTab extends StatelessWidget {
                         Icons.check_circle,
                         semanticLabel: 'Ya eres miembro',
                       )
+                    : (joinPolicy == 'approval' && uid != null)
+                    ? _JoinRequestTrailing(listId: d.id, uid: uid)
                     : TextButton(
                         onPressed: () async {
                           final user = FirebaseAuth.instance.currentUser;
                           if (user == null) return;
 
                           try {
-                            if (joinPolicy == 'open') {
-                              await ListService.instance.joinList(
-                                listId: d.id,
-                                uid: user.uid,
+                            await ListService.instance.joinList(
+                              listId: d.id,
+                              uid: user.uid,
+                            );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Te has unido ✅')),
                               );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Te has unido ✅'),
-                                  ),
-                                );
-                              }
-                            } else {
-                              await ListService.instance.requestJoin(
-                                listId: d.id,
-                                uid: user.uid,
-                              );
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Solicitud enviada ✅'),
-                                  ),
-                                );
-                              }
                             }
                           } catch (e) {
                             if (context.mounted) {
@@ -223,11 +209,8 @@ class _PublicListsTab extends StatelessWidget {
                             }
                           }
                         },
-                        child: Text(
-                          joinPolicy == 'open' ? 'Unirse' : 'Solicitar',
-                        ),
+                        child: const Text('Unirse'),
                       ),
-
                 onTap: () {
                   Navigator.push(
                     context,
@@ -306,6 +289,89 @@ class _MyListsTab extends StatelessWidget {
               ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+class _JoinRequestTrailing extends StatelessWidget {
+  final String listId;
+  final String uid;
+
+  const _JoinRequestTrailing({required this.listId, required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    final reqDocStream = FirebaseFirestore.instance
+        .collection('lists')
+        .doc(listId)
+        .collection('requests')
+        .doc(uid)
+        .snapshots();
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: reqDocStream,
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const TextButton(onPressed: null, child: Text('...'));
+        }
+
+        final doc = snap.data!;
+        final pending = doc.exists;
+
+        if (pending) {
+          return TextButton(
+            onPressed: () async {
+              final user = FirebaseAuth.instance.currentUser;
+              if (user == null) return;
+
+              try {
+                await ListService.instance.cancelJoinRequest(
+                  listId: listId,
+                  uid: user.uid,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Solicitud cancelada')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Cancelar'),
+          );
+        }
+
+        return TextButton(
+          onPressed: () async {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user == null) return;
+
+            try {
+              await ListService.instance.requestJoin(
+                listId: listId,
+                uid: user.uid,
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Solicitud enviada ✅')),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          child: const Text('Solicitar'),
         );
       },
     );

@@ -16,44 +16,8 @@ class ListDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(list.title),
-        actions: [
-          if (!isGuest)
-            IconButton(
-              tooltip: 'Editar lista',
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                // futuro: editar lista
-              },
-            ),
-        ],
-      ),
+    final listId = list.id;
 
-      body: _ListDetailBody(listId: list.id, isGuest: isGuest),
-
-      floatingActionButton: isGuest
-          ? null
-          : FloatingActionButton(
-              tooltip: 'Añadir item',
-              child: const Icon(Icons.add),
-              onPressed: () {
-                // futuro: añadir item
-              },
-            ),
-    );
-  }
-}
-
-class _ListDetailBody extends StatelessWidget {
-  final String listId;
-  final bool isGuest;
-
-  const _ListDetailBody({required this.listId, required this.isGuest});
-
-  @override
-  Widget build(BuildContext context) {
     final listDocStream = FirebaseFirestore.instance
         .collection('lists')
         .doc(listId)
@@ -62,15 +26,26 @@ class _ListDetailBody extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: listDocStream,
       builder: (context, snap) {
-        if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
+        if (snap.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text(list.title)),
+            body: Center(child: Text('Error: ${snap.error}')),
+          );
+        }
         if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return Scaffold(
+            appBar: AppBar(title: Text(list.title)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
         }
 
         final doc = snap.data!;
         final data = doc.data();
         if (!doc.exists || data == null) {
-          return const Center(child: Text('La lista no existe'));
+          return Scaffold(
+            appBar: AppBar(title: Text(list.title)),
+            body: const Center(child: Text('La lista no existe')),
+          );
         }
 
         final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
@@ -85,33 +60,251 @@ class _ListDetailBody extends StatelessWidget {
 
         final isAdmin =
             uid.isNotEmpty && (uid == createdBy || admins.contains(uid));
-        final showRequests = !isGuest && isAdmin && joinPolicy == 'approval';
+        final canSeeRequests = !isGuest && isAdmin && joinPolicy == 'approval';
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('Miembros', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            _MembersList(listId: listId, isAdmin: isAdmin, currentUid: uid),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(list.title),
+            actions: [
+              if (!isGuest)
+                IconButton(
+                  tooltip: 'Editar lista',
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    // futuro: editar lista
+                  },
+                ),
 
-            if (showRequests) ...[
-              const SizedBox(height: 24),
-              Text(
-                'Solicitudes',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              // Solicitudes
+              if (canSeeRequests)
+                _RequestsBadgeButton(
+                  listId: listId,
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (_) => _RequestsSheet(listId: listId),
+                    );
+                  },
+                ),
+            ],
+          ),
+
+          // Body miembros
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text('Miembros', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              _RequestsList(listId: listId),
+              _MembersList(listId: listId, isAdmin: isAdmin, currentUid: uid),
             ],
+          ),
 
-            if (!isGuest &&
-                uid.isNotEmpty &&
-                joinPolicy == 'approval' &&
-                !isAdmin) ...[
-              const SizedBox(height: 12),
-              _MyRequestStatus(listId: listId, uid: uid),
-            ],
+          floatingActionButton: isGuest
+              ? null
+              : FloatingActionButton(
+                  tooltip: 'Añadir item',
+                  child: const Icon(Icons.add),
+                  onPressed: () {
+                    // futuro: añadir item
+                  },
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _RequestsSheet extends StatelessWidget {
+  final String listId;
+
+  const _RequestsSheet({required this.listId});
+
+  @override
+  Widget build(BuildContext context) {
+    final requestsStream = FirebaseFirestore.instance
+        .collection('lists')
+        .doc(listId)
+        .collection('requests')
+        .orderBy('requestedAt', descending: false)
+        .snapshots();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 8,
+          bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Solicitudes',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Cerrar',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            Flexible(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: requestsStream,
+                builder: (context, snap) {
+                  if (snap.hasError) return Text('Error: ${snap.error}');
+                  if (!snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final docs = snap.data!.docs;
+                  if (docs.isEmpty) {
+                    return const Center(
+                      child: Text('No hay solicitudes pendientes'),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (context, i) {
+                      final d = docs[i];
+                      final requesterUid = d.id;
+                      final data = d.data();
+                      final username = (data['username'] ?? requesterUid)
+                          .toString();
+
+                      return ListTile(
+                        leading: const Icon(Icons.person_add),
+                        title: Text(username),
+                        trailing: Wrap(
+                          spacing: 8,
+                          children: [
+                            IconButton(
+                              tooltip: 'Rechazar',
+                              icon: const Icon(Icons.close),
+                              onPressed: () async {
+                                try {
+                                  await ListService.instance.rejectRequest(
+                                    listId: listId,
+                                    requesterUid: requesterUid,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Solicitud rechazada'),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                            IconButton(
+                              tooltip: 'Aprobar',
+                              icon: const Icon(Icons.check),
+                              onPressed: () async {
+                                try {
+                                  await ListService.instance.approveRequest(
+                                    listId: listId,
+                                    requesterUid: requesterUid,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Usuario aprobado ✅'),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RequestsBadgeButton extends StatelessWidget {
+  final String listId;
+  final VoidCallback onTap;
+
+  const _RequestsBadgeButton({required this.listId, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final countStream = FirebaseFirestore.instance
+        .collection('lists')
+        .doc(listId)
+        .collection('requests')
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: countStream,
+      builder: (context, snap) {
+        final count = snap.data?.size ?? 0;
+
+        return IconButton(
+          tooltip: 'Solicitudes',
+          onPressed: onTap,
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.inbox),
+              if (count > 0)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      count > 99 ? '99+' : '$count',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onError,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -148,226 +341,107 @@ class _MembersList extends StatelessWidget {
         final docs = snap.data!.docs;
         if (docs.isEmpty) return const Text('Aún no hay miembros');
 
-        return Column(
-          children: docs.map((d) {
-            final memberUid = d.id;
-            final data = d.data();
-            final username = (data['username'] ?? memberUid).toString();
-            final role = (data['role'] ?? 'member').toString();
+        // ✅ separar
+        final admins = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        final members = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-            final canKick = isAdmin && memberUid != currentUid;
-
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.person),
-              title: Text(username),
-              subtitle: Text(role),
-              trailing: canKick
-                  ? IconButton(
-                      tooltip: 'Expulsar',
-                      icon: const Icon(Icons.person_remove),
-                      onPressed: () async {
-                        final ok = await showDialog<bool>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Expulsar miembro'),
-                            content: Text(
-                              '¿Quieres expulsar a $username de la lista?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              FilledButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Expulsar'),
-                              ),
-                            ],
-                          ),
-                        );
-
-                        if (ok != true) return;
-
-                        try {
-                          await ListService.instance.removeMember(
-                            listId: listId,
-                            targetUid: memberUid,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('$username expulsado')),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          }
-                        }
-                      },
-                    )
-                  : null,
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-}
-
-class _RequestsList extends StatelessWidget {
-  final String listId;
-  const _RequestsList({required this.listId});
-
-  @override
-  Widget build(BuildContext context) {
-    final requestsStream = FirebaseFirestore.instance
-        .collection('lists')
-        .doc(listId)
-        .collection('requests')
-        .orderBy('requestedAt', descending: false)
-        .snapshots();
-
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: requestsStream,
-      builder: (context, snap) {
-        if (snap.hasError) return Text('Error: ${snap.error}');
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
+        for (final d in docs) {
+          final role = (d.data()['role'] ?? 'member').toString();
+          if (role == 'admin') {
+            admins.add(d);
+          } else {
+            members.add(d);
+          }
         }
 
-        final docs = snap.data!.docs;
-        if (docs.isEmpty) return const Text('No hay solicitudes pendientes');
+        // (opcional) ordenar por username
+        int byUsername(a, b) {
+          final ua = (a.data()['username'] ?? a.id).toString().toLowerCase();
+          final ub = (b.data()['username'] ?? b.id).toString().toLowerCase();
+          return ua.compareTo(ub);
+        }
+
+        admins.sort(byUsername);
+        members.sort(byUsername);
+
+        Widget tileFor(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+          final memberUid = d.id;
+          final data = d.data();
+          final username = (data['username'] ?? memberUid).toString();
+          final role = (data['role'] ?? 'member').toString();
+
+          final canKick = isAdmin && memberUid != currentUid;
+
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(role == 'admin' ? Icons.shield : Icons.person),
+            title: Text(username),
+            subtitle: Text(role),
+            trailing: canKick
+                ? IconButton(
+                    tooltip: 'Expulsar',
+                    icon: const Icon(Icons.person_remove),
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Expulsar miembro'),
+                          content: Text(
+                            '¿Quieres expulsar a $username de la lista?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Expulsar'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (ok != true) return;
+
+                      try {
+                        await ListService.instance.removeMember(
+                          listId: listId,
+                          targetUid: memberUid,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$username expulsado')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      }
+                    },
+                  )
+                : null,
+          );
+        }
 
         return Column(
-          children: docs.map((d) {
-            final requesterUid = d.id;
-            final data = d.data();
-            final username = (data['username'] ?? requesterUid).toString();
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- ADMINS ---
+            Text('Admins', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            ...admins.map(tileFor),
 
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.person_add),
-                title: Text(username),
-                subtitle: const Text('Pendiente'),
-                trailing: Wrap(
-                  spacing: 8,
-                  children: [
-                    IconButton(
-                      tooltip: 'Rechazar',
-                      icon: const Icon(Icons.close),
-                      onPressed: () async {
-                        try {
-                          await ListService.instance.rejectRequest(
-                            listId: listId,
-                            requesterUid: requesterUid,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Solicitud rechazada'),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                    IconButton(
-                      tooltip: 'Aprobar',
-                      icon: const Icon(Icons.check),
-                      onPressed: () async {
-                        try {
-                          await ListService.instance.approveRequest(
-                            listId: listId,
-                            requesterUid: requesterUid,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Usuario aprobado ✅'),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-}
+            const SizedBox(height: 16),
 
-class _MyRequestStatus extends StatelessWidget {
-  final String listId;
-  final String uid;
-
-  const _MyRequestStatus({required this.listId, required this.uid});
-
-  @override
-  Widget build(BuildContext context) {
-    final reqDocStream = FirebaseFirestore.instance
-        .collection('lists')
-        .doc(listId)
-        .collection('requests')
-        .doc(uid)
-        .snapshots();
-
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: reqDocStream,
-      builder: (context, snap) {
-        if (snap.hasError) return Text('Error: ${snap.error}');
-        if (!snap.hasData) return const SizedBox.shrink();
-
-        final doc = snap.data!;
-        if (!doc.exists) return const SizedBox.shrink(); // no hay solicitud
-
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.hourglass_top),
-            title: const Text('Solicitud pendiente'),
-            subtitle: const Text('Esperando aprobación del admin'),
-            trailing: TextButton(
-              onPressed: () async {
-                try {
-                  await ListService.instance.cancelJoinRequest(
-                    listId: listId,
-                    uid: uid,
-                  );
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Solicitud cancelada')),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-              child: const Text('Cancelar'),
-            ),
-          ),
+            // --- MIEMBROS ---
+            Text('Miembros', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            if (members.isEmpty) const Text('—') else ...members.map(tileFor),
+          ],
         );
       },
     );
