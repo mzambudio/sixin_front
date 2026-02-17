@@ -92,7 +92,7 @@ class _ListDetailBody extends StatelessWidget {
           children: [
             Text('Miembros', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            _MembersList(listId: listId),
+            _MembersList(listId: listId, isAdmin: isAdmin, currentUid: uid),
 
             if (showRequests) ...[
               const SizedBox(height: 24),
@@ -120,7 +120,14 @@ class _ListDetailBody extends StatelessWidget {
 
 class _MembersList extends StatelessWidget {
   final String listId;
-  const _MembersList({required this.listId});
+  final bool isAdmin;
+  final String currentUid;
+
+  const _MembersList({
+    required this.listId,
+    required this.isAdmin,
+    required this.currentUid,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -143,15 +150,65 @@ class _MembersList extends StatelessWidget {
 
         return Column(
           children: docs.map((d) {
+            final memberUid = d.id;
             final data = d.data();
-            final username = (data['username'] ?? d.id).toString();
+            final username = (data['username'] ?? memberUid).toString();
             final role = (data['role'] ?? 'member').toString();
+
+            final canKick = isAdmin && memberUid != currentUid;
 
             return ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.person),
               title: Text(username),
               subtitle: Text(role),
+              trailing: canKick
+                  ? IconButton(
+                      tooltip: 'Expulsar',
+                      icon: const Icon(Icons.person_remove),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Expulsar miembro'),
+                            content: Text(
+                              '¿Quieres expulsar a $username de la lista?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancelar'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Expulsar'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (ok != true) return;
+
+                        try {
+                          await ListService.instance.removeMember(
+                            listId: listId,
+                            targetUid: memberUid,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('$username expulsado')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error: $e')),
+                            );
+                          }
+                        }
+                      },
+                    )
+                  : null,
             );
           }).toList(),
         );

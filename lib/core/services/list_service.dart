@@ -247,4 +247,33 @@ class ListService {
         .doc(uid)
         .delete();
   }
+
+  Future<void> removeMember({
+    required String listId,
+    required String targetUid,
+  }) async {
+    final listRef = _db.collection('lists').doc(listId);
+    final memberRef = listRef.collection('members').doc(targetUid);
+    final reqRef = listRef.collection('requests').doc(targetUid);
+
+    await _db.runTransaction((tx) async {
+      final listSnap = await tx.get(listRef);
+      if (!listSnap.exists) throw Exception('La lista no existe');
+
+      final memberSnap = await tx.get(memberRef);
+      final reqSnap = await tx.get(reqRef);
+
+      if (memberSnap.exists) {
+        tx.delete(memberRef);
+      }
+
+      if (reqSnap.exists) {
+        tx.delete(reqRef);
+      }
+
+      tx.update(listRef, {
+        'memberUids': FieldValue.arrayRemove([targetUid]),
+      });
+    });
+  }
 }
