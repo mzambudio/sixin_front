@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ListService {
   ListService._();
@@ -275,5 +277,39 @@ class ListService {
         'memberUids': FieldValue.arrayRemove([targetUid]),
       });
     });
+  }
+
+  Future<void> deleteListViaBackend({required String listId}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('No hay sesión activa');
+    }
+
+    final token = await user.getIdToken();
+
+    // Android Emulator: usa 10.0.2.2 en vez de localhost
+    // Dispositivo físico: usa la IP local del PC
+    final uri = Uri.parse('http://10.0.2.2:3000/api/lists/$listId');
+
+    final resp = await http.delete(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    Map<String, dynamic>? data;
+    try {
+      data = jsonDecode(resp.body) as Map<String, dynamic>;
+    } catch (_) {
+      data = null;
+    }
+
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      final msg = (data?['error'] ?? 'Error HTTP ${resp.statusCode}')
+          .toString();
+      throw Exception(msg);
+    }
   }
 }

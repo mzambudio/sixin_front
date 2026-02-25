@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sixin_front/core/services/list_service.dart';
 
-class ListDetailScreen extends StatelessWidget {
+class ListDetailScreen extends StatefulWidget {
   final SixinList list;
   final bool isGuest;
 
@@ -15,8 +15,20 @@ class ListDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<ListDetailScreen> createState() => _ListDetailScreenState();
+}
+
+class _ListDetailScreenState extends State<ListDetailScreen> {
+  bool _editMode = false;
+
+  void _toggleEditMode() {
+    setState(() => _editMode = !_editMode);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final listId = list.id;
+    final listId = widget.list.id;
+    final isGuest = widget.isGuest;
 
     final listDocStream = FirebaseFirestore.instance
         .collection('lists')
@@ -28,13 +40,13 @@ class ListDetailScreen extends StatelessWidget {
       builder: (context, snap) {
         if (snap.hasError) {
           return Scaffold(
-            appBar: AppBar(title: Text(list.title)),
+            appBar: AppBar(title: Text(widget.list.title)),
             body: Center(child: Text('Error: ${snap.error}')),
           );
         }
         if (!snap.hasData) {
           return Scaffold(
-            appBar: AppBar(title: Text(list.title)),
+            appBar: AppBar(title: Text(widget.list.title)),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
@@ -43,7 +55,7 @@ class ListDetailScreen extends StatelessWidget {
         final data = doc.data();
         if (!doc.exists || data == null) {
           return Scaffold(
-            appBar: AppBar(title: Text(list.title)),
+            appBar: AppBar(title: Text(widget.list.title)),
             body: const Center(child: Text('La lista no existe')),
           );
         }
@@ -60,19 +72,19 @@ class ListDetailScreen extends StatelessWidget {
 
         final isAdmin =
             uid.isNotEmpty && (uid == createdBy || admins.contains(uid));
-        final canSeeRequests = !isGuest && isAdmin && joinPolicy == 'approval';
+        final canSeeRequests =
+            !widget.isGuest && isAdmin && joinPolicy == 'approval';
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(list.title),
+            title: Text(widget.list.title),
             actions: [
+              // Editar lista
               if (!isGuest)
                 IconButton(
-                  tooltip: 'Editar lista',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () {
-                    // futuro: editar lista
-                  },
+                  tooltip: _editMode ? 'Salir de edición' : 'Editar lista',
+                  icon: Icon(_editMode ? Icons.check : Icons.edit),
+                  onPressed: _toggleEditMode,
                 ),
 
               // Solicitudes
@@ -91,7 +103,7 @@ class ListDetailScreen extends StatelessWidget {
             ],
           ),
 
-          // Body miembros
+          // Body: miembros
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -101,13 +113,13 @@ class ListDetailScreen extends StatelessWidget {
             ],
           ),
 
-          floatingActionButton: isGuest
+          floatingActionButton: widget.isGuest
               ? null
               : FloatingActionButton(
-                  tooltip: 'Añadir item',
-                  child: const Icon(Icons.add),
+                  tooltip: 'Invitar miembros',
+                  child: const Icon(Icons.person_add),
                   onPressed: () {
-                    // futuro: añadir item
+                    // futuro: invitar usuario por username o email
                   },
                 ),
         );
