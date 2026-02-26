@@ -165,7 +165,7 @@ class ListService {
         throw Exception('Esta lista es de entrada directa.');
       }
 
-      // ✅ si ya es miembro, no puede pedir
+      // Si ya es miembro, no puede pedir
       if (memberUids.contains(uid)) {
         throw Exception('Ya perteneces a esta lista.');
       }
@@ -311,5 +311,109 @@ class ListService {
           .toString();
       throw Exception(msg);
     }
+  }
+
+  Future<void> makeAdmin({
+    required String listId,
+    required String targetUid,
+  }) async {
+    final listRef = _db.collection('lists').doc(listId);
+    final memberRef = listRef.collection('members').doc(targetUid);
+
+    await _db.runTransaction((tx) async {
+      final listSnap = await tx.get(listRef);
+      if (!listSnap.exists) throw Exception('La lista no existe');
+
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) throw Exception('Ese usuario no es miembro');
+
+      // WRITES después
+      tx.update(memberRef, {'role': 'admin'});
+      tx.update(listRef, {
+        'admins': FieldValue.arrayUnion([targetUid]),
+      });
+    });
+  }
+
+  Future<void> demoteAdmin({
+    required String listId,
+    required String targetUid,
+  }) async {
+    final listRef = _db.collection('lists').doc(listId);
+    final memberRef = listRef.collection('members').doc(targetUid);
+
+    await _db.runTransaction((tx) async {
+      final listSnap = await tx.get(listRef);
+      if (!listSnap.exists) throw Exception('La lista no existe');
+
+      final data = listSnap.data()!;
+      final adminsRaw = data['admins'];
+      final admins = adminsRaw is List
+          ? adminsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+
+      if (!admins.contains(targetUid)) {
+        return;
+      }
+
+      // No dejes la lista sin admins
+      if (admins.length <= 1) {
+        throw Exception('Debe quedar al menos un administrador.');
+      }
+
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) throw Exception('Ese usuario no es miembro');
+
+      tx.update(memberRef, {'role': 'member'});
+      tx.update(listRef, {
+        'admins': FieldValue.arrayRemove([targetUid]),
+      });
+    });
+  }
+
+  Future<void> leaveList({
+    required String listId,
+    required String uid,
+    required bool wasAdmin,
+  }) async {
+    final listRef = _db.collection('lists').doc(listId);
+    final memberRef = listRef.collection('members').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final listSnap = await tx.get(listRef);
+      if (!listSnap.exists) throw Exception('La lista no existe');
+
+      final data = listSnap.data()!;
+      final adminsRaw = data['admins'];
+      final admins = adminsRaw is List
+          ? adminsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+
+      // Si era admin y es el último admin, no puede salir
+      if (wasAdmin && admins.where((a) => a == uid).isNotEmpty) {
+        if (admins.length <= 1) {
+          throw Exception(
+            'Eres el único admin. Designa a otro antes de salir.',
+          );
+        }
+      }
+
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) {
+        return;
+      }
+
+      tx.delete(memberRef);
+
+      final updates = <String, dynamic>{
+        'memberUids': FieldValue.arrayRemove([uid]),
+      };
+
+      if (wasAdmin) {
+        updates['admins'] = FieldValue.arrayRemove([uid]);
+      }
+
+      tx.update(listRef, updates);
+    });
   }
 }

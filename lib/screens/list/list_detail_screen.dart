@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sixin_front/core/services/list_service.dart';
 
-class ListDetailScreen extends StatefulWidget {
+class ListDetailScreen extends StatelessWidget {
   final SixinList list;
   final bool isGuest;
 
@@ -15,20 +15,8 @@ class ListDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<ListDetailScreen> createState() => _ListDetailScreenState();
-}
-
-class _ListDetailScreenState extends State<ListDetailScreen> {
-  bool _editMode = false;
-
-  void _toggleEditMode() {
-    setState(() => _editMode = !_editMode);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final listId = widget.list.id;
-    final isGuest = widget.isGuest;
+    final listId = list.id;
 
     final listDocStream = FirebaseFirestore.instance
         .collection('lists')
@@ -40,13 +28,13 @@ class _ListDetailScreenState extends State<ListDetailScreen> {
       builder: (context, snap) {
         if (snap.hasError) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.list.title)),
+            appBar: AppBar(title: Text(list.title)),
             body: Center(child: Text('Error: ${snap.error}')),
           );
         }
         if (!snap.hasData) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.list.title)),
+            appBar: AppBar(title: Text(list.title)),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
@@ -55,13 +43,12 @@ class _ListDetailScreenState extends State<ListDetailScreen> {
         final data = doc.data();
         if (!doc.exists || data == null) {
           return Scaffold(
-            appBar: AppBar(title: Text(widget.list.title)),
+            appBar: AppBar(title: Text(list.title)),
             body: const Center(child: Text('La lista no existe')),
           );
         }
 
         final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
-        final createdBy = (data['createdBy'] ?? '') as String;
         final adminsRaw = data['admins'];
         final admins = adminsRaw is List
             ? adminsRaw.map((e) => e.toString()).toList()
@@ -70,23 +57,14 @@ class _ListDetailScreenState extends State<ListDetailScreen> {
         final user = FirebaseAuth.instance.currentUser;
         final uid = user?.uid ?? '';
 
-        final isAdmin =
-            uid.isNotEmpty && (uid == createdBy || admins.contains(uid));
-        final canSeeRequests =
-            !widget.isGuest && isAdmin && joinPolicy == 'approval';
+        final isAdmin = uid.isNotEmpty && admins.contains(uid);
+
+        final canSeeRequests = !isGuest && isAdmin && joinPolicy == 'approval';
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(widget.list.title),
+            title: Text(list.title),
             actions: [
-              // Editar lista
-              if (!isGuest)
-                IconButton(
-                  tooltip: _editMode ? 'Salir de edición' : 'Editar lista',
-                  icon: Icon(_editMode ? Icons.check : Icons.edit),
-                  onPressed: _toggleEditMode,
-                ),
-
               // Solicitudes
               if (canSeeRequests)
                 _RequestsBadgeButton(
@@ -113,7 +91,7 @@ class _ListDetailScreenState extends State<ListDetailScreen> {
             ],
           ),
 
-          floatingActionButton: widget.isGuest
+          floatingActionButton: isGuest
               ? null
               : FloatingActionButton(
                   tooltip: 'Invitar miembros',
@@ -325,8 +303,8 @@ class _RequestsBadgeButton extends StatelessWidget {
 
 class _MembersList extends StatelessWidget {
   final String listId;
-  final bool isAdmin;
-  final String currentUid;
+  final bool isAdmin; // si el usuario actual es admin (según doc lists)
+  final String currentUid; // uid del usuario actual
 
   const _MembersList({
     required this.listId,
@@ -346,85 +324,178 @@ class _MembersList extends StatelessWidget {
       stream: membersStream,
       builder: (context, snap) {
         if (snap.hasError) return Text('Error: ${snap.error}');
-        if (!snap.hasData) {
+        if (!snap.hasData)
           return const Center(child: CircularProgressIndicator());
-        }
 
         final docs = snap.data!.docs;
         if (docs.isEmpty) return const Text('Aún no hay miembros');
 
-        // ✅ separar
-        final admins = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-        final members = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        // Separar admins / miembros
+        final adminDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        final memberDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
         for (final d in docs) {
           final role = (d.data()['role'] ?? 'member').toString();
           if (role == 'admin') {
-            admins.add(d);
+            adminDocs.add(d);
           } else {
-            members.add(d);
+            memberDocs.add(d);
           }
         }
 
-        // (opcional) ordenar por username
+        // Ordenar por username
         int byUsername(a, b) {
           final ua = (a.data()['username'] ?? a.id).toString().toLowerCase();
           final ub = (b.data()['username'] ?? b.id).toString().toLowerCase();
           return ua.compareTo(ub);
         }
 
-        admins.sort(byUsername);
-        members.sort(byUsername);
+        adminDocs.sort(byUsername);
+        memberDocs.sort(byUsername);
 
+        // Para saber si el usuario actual es el ÚNICO admin (usamos lo que hay en members)
+        final adminUids = adminDocs.map((d) => d.id).toList();
+        final isCurrentUserAdmin = adminUids.contains(currentUid);
+        final isOnlyAdmin = isCurrentUserAdmin && adminUids.length == 1;
+
+        // Widget tile con menú según caso
         Widget tileFor(QueryDocumentSnapshot<Map<String, dynamic>> d) {
           final memberUid = d.id;
           final data = d.data();
           final username = (data['username'] ?? memberUid).toString();
           final role = (data['role'] ?? 'member').toString();
+          final isSelf = memberUid == currentUid;
 
-          final canKick = isAdmin && memberUid != currentUid;
+          // Menú disponible:
+          // - siempre para el propio usuario (salir)
+          // - para admins: degradar a otros admins y (si quieres) expulsar
+          final canShowMenu =
+              isSelf || (isAdmin && !isSelf); // admin puede actuar sobre otros
 
           return ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(role == 'admin' ? Icons.shield : Icons.person),
             title: Text(username),
             subtitle: Text(role),
-            trailing: canKick
-                ? IconButton(
-                    tooltip: 'Expulsar',
-                    icon: const Icon(Icons.person_remove),
-                    onPressed: () async {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Expulsar miembro'),
-                          content: Text(
-                            '¿Quieres expulsar a $username de la lista?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancelar'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('Expulsar'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (ok != true) return;
-
+            trailing: canShowMenu
+                ? PopupMenuButton<String>(
+                    tooltip: 'Acciones',
+                    onSelected: (value) async {
                       try {
-                        await ListService.instance.removeMember(
-                          listId: listId,
-                          targetUid: memberUid,
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('$username expulsado')),
+                        // --- SALIR (solo self) ---
+                        if (value == 'leave') {
+                          if (isOnlyAdmin) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Eres el único admin. Designa a otro admin antes de salir.',
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          
+                          await ListService.instance.leaveList(
+                            listId: listId,
+                            uid: currentUid,
+                            wasAdmin: role == 'admin',
                           );
+
+                          if (context.mounted) {
+                            Navigator.pop(context); // sales del detalle
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Has salido del grupo'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // --- DEGRADAR ADMIN (solo admin sobre otros admins) ---
+                        if (value == 'demote_admin') {
+                          // opcional: impedir dejar la lista sin admins
+                          if (role == 'admin' && adminUids.length == 1) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Debe quedar al menos un admin.',
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          await ListService.instance.demoteAdmin(
+                            listId: listId,
+                            targetUid: memberUid,
+                          );
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$username ya no es admin'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // --- HACER ADMIN (solo admin sobre miembros) ---
+                        if (value == 'make_admin') {
+                          await ListService.instance.makeAdmin(
+                            listId: listId,
+                            targetUid: memberUid,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$username ahora es admin'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        // --- EXPULSAR (solo admin sobre otros) ---
+                        if (value == 'kick') {
+                          final ok = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Expulsar miembro'),
+                              content: Text(
+                                '¿Quieres expulsar a $username de la lista?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Expulsar'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (ok != true) return;
+
+                          await ListService.instance.removeMember(
+                            listId: listId,
+                            targetUid: memberUid,
+                          );
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('$username expulsado')),
+                            );
+                          }
                         }
                       } catch (e) {
                         if (context.mounted) {
@@ -434,6 +505,50 @@ class _MembersList extends StatelessWidget {
                         }
                       }
                     },
+                    itemBuilder: (context) {
+                      final items = <PopupMenuEntry<String>>[];
+
+                      // Self: solo "Salir"
+                      if (isSelf) {
+                        items.add(
+                          const PopupMenuItem(
+                            value: 'leave',
+                            child: Text('Salir del grupo'),
+                          ),
+                        );
+                        return items;
+                      }
+
+                      // Otros: solo admins pueden ver menú
+                      if (!isAdmin) return items;
+
+                      // Si es admin -> opciones según role del objetivo
+                      if (role == 'admin') {
+                        items.add(
+                          const PopupMenuItem(
+                            value: 'demote_admin',
+                            child: Text('Dejar de ser admin'),
+                          ),
+                        );
+                      } else {
+                        items.add(
+                          const PopupMenuItem(
+                            value: 'make_admin',
+                            child: Text('Hacer admin'),
+                          ),
+                        );
+                      }
+
+                      items.add(const PopupMenuDivider());
+                      items.add(
+                        const PopupMenuItem(
+                          value: 'kick',
+                          child: Text('Expulsar'),
+                        ),
+                      );
+
+                      return items;
+                    },
                   )
                 : null,
           );
@@ -442,17 +557,18 @@ class _MembersList extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- ADMINS ---
             Text('Admins', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 6),
-            ...admins.map(tileFor),
+            ...adminDocs.map(tileFor),
 
             const SizedBox(height: 16),
 
-            // --- MIEMBROS ---
             Text('Miembros', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 6),
-            if (members.isEmpty) const Text('—') else ...members.map(tileFor),
+            if (memberDocs.isEmpty)
+              const Text('—')
+            else
+              ...memberDocs.map(tileFor),
           ],
         );
       },

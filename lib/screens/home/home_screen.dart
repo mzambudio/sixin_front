@@ -153,6 +153,8 @@ class _PublicListsTab extends StatelessWidget {
             final data = d.data();
             final user = FirebaseAuth.instance.currentUser;
             final uid = user?.uid;
+            final createdBy = (data['createdBy'] ?? '') as String;
+            final isOwner = uid != null && createdBy == uid;
 
             final title = (data['title'] ?? '(sin título)') as String;
             final owner = (data['ownerUsername'] ?? '—') as String;
@@ -169,6 +171,10 @@ class _PublicListsTab extends StatelessWidget {
               items: const [],
             );
 
+            final subtitleText = isOwner
+                ? 'Creada por ti (${list.ownerName})'
+                : 'Creada por ${list.ownerName}';
+
             final isMember = uid != null && memberUids.contains(uid);
 
             final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
@@ -176,7 +182,7 @@ class _PublicListsTab extends StatelessWidget {
             return Card(
               child: ListTile(
                 title: Text(list.title),
-                subtitle: Text('Creada por ${list.ownerName}'),
+                subtitle: Text(subtitleText),
                 trailing: isGuest
                     ? const Icon(Icons.visibility)
                     : isMember
@@ -260,6 +266,8 @@ class _MyListsTab extends StatelessWidget {
           itemBuilder: (context, i) {
             final d = docs[i];
             final data = d.data();
+            final createdBy = (data['createdBy'] ?? '') as String;
+            final isOwner = createdBy == uid;
 
             final title = (data['title'] ?? '(sin título)') as String;
             final owner = (data['ownerUsername'] ?? '—') as String;
@@ -272,10 +280,14 @@ class _MyListsTab extends StatelessWidget {
               items: const [],
             );
 
+            final subtitleText = isOwner
+                ? 'Creada por ti (${list.ownerName})'
+                : 'Creada por ${list.ownerName}';
+
             return Card(
               child: ListTile(
                 title: Text(list.title),
-                subtitle: Text('Creada por ${list.ownerName}'),
+                subtitle: Text(subtitleText),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.push(
