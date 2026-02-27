@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sixin_front/core/services/list_service.dart';
+import 'package:flutter/services.dart';
 
 class CreateListScreen extends StatefulWidget {
   const CreateListScreen({super.key});
@@ -68,9 +69,29 @@ class _CreateListScreenState extends State<CreateListScreen> {
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Código de acceso'),
-            content: SelectableText(
-              code,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            content: Row(
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    code,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Copiar',
+                  icon: const Icon(Icons.copy),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: code));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Código copiado ✅')),
+                    );
+                  },
+                ),
+              ],
             ),
             actions: [
               TextButton(

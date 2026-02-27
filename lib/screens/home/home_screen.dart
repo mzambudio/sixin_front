@@ -30,6 +30,67 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  Future<void> _joinByCodeDialog(BuildContext context) async {
+    final ctrl = TextEditingController();
+
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Introducir código'),
+        content: TextField(
+          controller: ctrl,
+          textCapitalization: TextCapitalization.characters,
+          decoration: const InputDecoration(
+            hintText: 'ABCD-EF3K-9ZQ2',
+            labelText: 'Código',
+          ),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+
+    if (code == null) return;
+
+    try {
+      final listId = await ListService.instance.previewListByCode(
+        rawCode: code,
+      );
+
+      if (!context.mounted) return;
+
+      final placeholder = SixinList(
+        id: listId,
+        title: 'Cargando...',
+        ownerName: '—',
+        isPublic: false,
+        items: const [],
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ListDetailScreen(list: placeholder, isGuest: false),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,17 +98,19 @@ class _HomeScreenState extends State<HomeScreen>
     final authUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      drawer: isGuest ? null : _HomeDrawer(),
       appBar: AppBar(
         title: const Text('Sixin'),
+        leading: isGuest
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menú',
+                  icon: const Icon(Icons.person),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         actions: [
-          if (!isGuest)
-            IconButton(
-              tooltip: 'Perfil',
-              icon: const Icon(Icons.person),
-              onPressed: () {
-                Navigator.pushNamed(context, '/profile');
-              },
-            ),
           IconButton(
             tooltip: isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
             icon: Icon(isGuest ? Icons.login : Icons.logout),
@@ -71,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         ],
-
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -80,10 +142,6 @@ class _HomeScreenState extends State<HomeScreen>
           ],
         ),
       ),
-
-      /// ───────────────
-      /// BODY - TAB VIEWS
-      /// ───────────────
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -91,17 +149,35 @@ class _HomeScreenState extends State<HomeScreen>
           if (!isGuest) _MyListsTab(uid: authUser?.uid ?? ''),
         ],
       ),
+      floatingActionButton: isGuest
+          ? FloatingActionButton(
+              onPressed: () => _showLoginRequired(context),
+              tooltip: 'Inicia sesión para crear o unirte a listas',
+              child: const Icon(Icons.lock),
+            )
+          : Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                // FAB: introducir código (llave) - arriba
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 72), // separa del otro
+                  child: FloatingActionButton(
+                    heroTag: 'fab_code',
+                    tooltip: 'Introducir código',
+                    child: const Icon(Icons.key),
+                    onPressed: () => _joinByCodeDialog(context),
+                  ),
+                ),
 
-      /// ───────────────
-      /// ACTION BUTTON - CREAR LISTA
-      /// ───────────────
-      floatingActionButton: FloatingActionButton(
-        onPressed: isGuest
-            ? () => _showLoginRequired(context)
-            : () => _createList(context),
-        tooltip: isGuest ? 'Inicia sesión para crear listas' : 'Crear lista',
-        child: Icon(isGuest ? Icons.lock : Icons.add),
-      ),
+                // FAB: crear lista (add) - abajo
+                FloatingActionButton(
+                  heroTag: 'fab_create',
+                  tooltip: 'Crear lista',
+                  child: const Icon(Icons.add),
+                  onPressed: () => _createList(context),
+                ),
+              ],
+            ),
     );
   }
 
@@ -116,6 +192,41 @@ class _HomeScreenState extends State<HomeScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Inicia sesión para crear o unirte a listas'),
+      ),
+    );
+  }
+}
+
+/// ───────────────
+/// DRAWER DE NAVEGACIÓN
+/// ───────────────
+class _HomeDrawer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            const ListTile(leading: Icon(Icons.person), title: Text('Menú')),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.account_circle),
+              title: const Text('Perfil'),
+              onTap: () {
+                Navigator.pop(context); // cierra el drawer
+                Navigator.pushNamed(context, '/profile');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail_outline),
+              title: const Text('Invitaciones'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/invitations');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import '../../models/models.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sixin_front/core/services/list_service.dart';
+import 'package:flutter/services.dart';
 
 class ListDetailScreen extends StatelessWidget {
   final SixinList list;
@@ -49,6 +50,9 @@ class ListDetailScreen extends StatelessWidget {
         }
 
         final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
+        final visibility = (data['visibility'] ?? 'public') as String;
+        final joinCode = (data['joinCode'] ?? '').toString();
+        final isPrivate = visibility == 'private';
         final adminsRaw = data['admins'];
         final admins = adminsRaw is List
             ? adminsRaw.map((e) => e.toString()).toList()
@@ -56,14 +60,30 @@ class ListDetailScreen extends StatelessWidget {
 
         final user = FirebaseAuth.instance.currentUser;
         final uid = user?.uid ?? '';
-
         final isAdmin = uid.isNotEmpty && admins.contains(uid);
-
+        final isOnlyAdmin = isAdmin && admins.length == 1;
         final canSeeRequests = !isGuest && isAdmin && joinPolicy == 'approval';
+
+        final memberUidsRaw = data['memberUids'];
+        final memberUids = memberUidsRaw is List
+            ? memberUidsRaw.map((e) => e.toString()).toList()
+            : <String>[];
+
+        final isMember = uid.isNotEmpty && memberUids.contains(uid);
+
+        final requestDocStream =
+            (isGuest || uid.isEmpty || joinPolicy != 'approval')
+            ? null
+            : FirebaseFirestore.instance
+                  .collection('lists')
+                  .doc(listId)
+                  .collection('requests')
+                  .doc(uid)
+                  .snapshots();
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(list.title),
+            title: Text((data['title'] ?? list.title).toString()),
             actions: [
               // Solicitudes
               if (canSeeRequests)
@@ -78,6 +98,115 @@ class ListDetailScreen extends StatelessWidget {
                     );
                   },
                 ),
+
+              // Configuración (solo admin)
+              if (!isGuest && isAdmin)
+                PopupMenuButton<String>(
+                  tooltip: 'Configuración',
+                  icon: const Icon(Icons.settings),
+                  onSelected: (value) async {
+                    // Mostrar código de acceso (solo si es privado)
+                    if (value == 'show_code') {
+                      await showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Código del grupo'),
+                          content: Row(
+                            children: [
+                              Expanded(
+                                child: SelectableText(
+                                  joinCode.isEmpty ? '—' : joinCode,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Copiar',
+                                icon: const Icon(Icons.copy),
+                                onPressed: joinCode.isEmpty
+                                    ? null
+                                    : () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(text: joinCode),
+                                        );
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Código copiado ✅'),
+                                          ),
+                                        );
+                                      },
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cerrar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      return;
+                    }
+                    // Borrar grupo
+                    if (value == 'delete_group') {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Borrar grupo'),
+                          content: const Text(
+                            'Se borrará el grupo, miembros y solicitudes. Esta acción no se puede deshacer.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Borrar'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (ok != true) return;
+
+                      try {
+                        await ListService.instance.deleteGroupViaBackend(
+                          listId: listId,
+                        );
+
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Grupo borrado ✅')),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (isPrivate)
+                      const PopupMenuItem(
+                        value: 'show_code',
+                        child: Text('Ver código'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'delete_group',
+                      child: Text('Borrar grupo'),
+                    ),
+                  ],
+                ),
             ],
           ),
 
@@ -91,14 +220,287 @@ class ListDetailScreen extends StatelessWidget {
             ],
           ),
 
-          floatingActionButton: isGuest
+          // Invitar miembros (invitación directa o por código)
+          floatingActionButton: (isGuest || !isAdmin)
               ? null
               : FloatingActionButton(
                   tooltip: 'Invitar miembros',
                   child: const Icon(Icons.person_add),
-                  onPressed: () {
-                    // futuro: invitar usuario por username o email
+                  onPressed: () async {
+                    final ctrl = TextEditingController();
+
+                    await showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Invitar'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Mostrar código de acceso (solo si es privado)
+                            if (isPrivate) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SelectableText(
+                                      joinCode.isEmpty ? '—' : joinCode,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Copiar código',
+                                    icon: const Icon(Icons.copy),
+                                    onPressed: joinCode.isEmpty
+                                        ? null
+                                        : () async {
+                                            await Clipboard.setData(
+                                              ClipboardData(text: joinCode),
+                                            );
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Código copiado ✅',
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ],
+                              ),
+                              const Divider(),
+                              const SizedBox(height: 10),
+                            ],
+                            // Invitar por username
+                            TextField(
+                              controller: ctrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Nombre de usuario',
+                                border: OutlineInputBorder(),
+                              ),
+                              textInputAction: TextInputAction.done,
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cerrar'),
+                          ),
+                          FilledButton(
+                            onPressed: () async {
+                              final input = ctrl.text.trim();
+                              if (input.isEmpty) return;
+
+                              try {
+                                await ListService.instance.inviteByUsername(
+                                  listId: listId,
+                                  usernameInput: input,
+                                );
+                                if (!context.mounted) return;
+
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Invitación enviada ✅'),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            },
+                            child: const Text('Enviar'),
+                          ),
+                        ],
+                      ),
+                    );
                   },
+                ),
+
+          bottomNavigationBar: isGuest
+              ? null
+              : SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: isMember
+                        // -------------------------
+                        // MIEMBRO => SALIR (ROJO)
+                        // -------------------------
+                        ? FilledButton.icon(
+                            icon: const Icon(Icons.exit_to_app),
+                            label: const Text('Salir del grupo'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onError,
+                            ),
+                            onPressed: () async {
+                              if (isOnlyAdmin) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Eres el único admin. Designa a otro admin antes de salir.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final ok = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('Salir del grupo'),
+                                  content: const Text(
+                                    '¿Quieres salir de este grupo?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancelar'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Salir'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (ok != true) return;
+
+                              try {
+                                await ListService.instance.leaveList(
+                                  listId: listId,
+                                  uid: uid,
+                                  wasAdmin: isAdmin,
+                                );
+
+                                if (!context.mounted) return;
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Has salido del grupo'),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            },
+                          )
+                        // -------------------------
+                        // NO MIEMBRO => UNIRSE / SOLICITAR
+                        // -------------------------
+                        : (joinPolicy == 'approval' && requestDocStream != null)
+                        ? StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: requestDocStream,
+                            builder: (context, reqSnap) {
+                              final pending = reqSnap.data?.exists == true;
+
+                              if (pending) {
+                                // ✅ solicitud pendiente -> permitir cancelar
+                                return FilledButton.icon(
+                                  icon: const Icon(Icons.cancel),
+                                  label: const Text('Cancelar solicitud'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.onError,
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      await ListService.instance
+                                          .cancelJoinRequest(
+                                            listId: listId,
+                                            uid: uid,
+                                          );
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Solicitud cancelada'),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
+                                  },
+                                );
+                              }
+
+                              // ✅ no hay solicitud -> permitir solicitar
+                              return FilledButton.icon(
+                                icon: const Icon(Icons.send),
+                                label: const Text('Solicitar unirme'),
+                                onPressed: () async {
+                                  try {
+                                    await ListService.instance.requestJoin(
+                                      listId: listId,
+                                      uid: uid,
+                                    );
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Solicitud enviada ✅'),
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error: $e')),
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                          )
+                        : FilledButton.icon(
+                            icon: const Icon(Icons.login),
+                            label: const Text('Unirme'),
+                            onPressed: () async {
+                              try {
+                                await ListService.instance.joinList(
+                                  listId: listId,
+                                  uid: uid,
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Te has unido ✅'),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            },
+                          ),
+                  ),
                 ),
         );
       },
@@ -244,6 +646,7 @@ class _RequestsSheet extends StatelessWidget {
   }
 }
 
+// Botón de solicitudes con badge que muestra el número de solicitudes pendientes
 class _RequestsBadgeButton extends StatelessWidget {
   final String listId;
   final VoidCallback onTap;
@@ -301,10 +704,11 @@ class _RequestsBadgeButton extends StatelessWidget {
   }
 }
 
+// Widget que muestra la lista de miembros, separados por admins y miembros normales, con opciones según el rol del usuario actual
 class _MembersList extends StatelessWidget {
   final String listId;
-  final bool isAdmin; // si el usuario actual es admin (según doc lists)
-  final String currentUid; // uid del usuario actual
+  final bool isAdmin;
+  final String currentUid;
 
   const _MembersList({
     required this.listId,
@@ -324,8 +728,9 @@ class _MembersList extends StatelessWidget {
       stream: membersStream,
       builder: (context, snap) {
         if (snap.hasError) return Text('Error: ${snap.error}');
-        if (!snap.hasData)
+        if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
 
         final docs = snap.data!.docs;
         if (docs.isEmpty) return const Text('Aún no hay miembros');
@@ -367,10 +772,8 @@ class _MembersList extends StatelessWidget {
           final isSelf = memberUid == currentUid;
 
           // Menú disponible:
-          // - siempre para el propio usuario (salir)
           // - para admins: degradar a otros admins y (si quieres) expulsar
-          final canShowMenu =
-              isSelf || (isAdmin && !isSelf); // admin puede actuar sobre otros
+          final canShowMenu = isAdmin && !isSelf;
 
           return ListTile(
             contentPadding: EdgeInsets.zero,
@@ -396,7 +799,7 @@ class _MembersList extends StatelessWidget {
                             }
                             return;
                           }
-                          
+
                           await ListService.instance.leaveList(
                             listId: listId,
                             uid: currentUid,
@@ -507,17 +910,6 @@ class _MembersList extends StatelessWidget {
                     },
                     itemBuilder: (context) {
                       final items = <PopupMenuEntry<String>>[];
-
-                      // Self: solo "Salir"
-                      if (isSelf) {
-                        items.add(
-                          const PopupMenuItem(
-                            value: 'leave',
-                            child: Text('Salir del grupo'),
-                          ),
-                        );
-                        return items;
-                      }
 
                       // Otros: solo admins pueden ver menú
                       if (!isAdmin) return items;

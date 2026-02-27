@@ -88,6 +88,7 @@ class ListService {
       'createdAt': now,
       'updatedAt': now,
       if (joinCodeHash != null) 'joinCodeHash': joinCodeHash,
+      if (joinCode != null) 'joinCode': joinCode,
     });
 
     batch.set(membersRef, {
@@ -97,7 +98,11 @@ class ListService {
     });
 
     if (codeRef != null) {
-      batch.set(codeRef, {'listId': listsRef.id, 'createdAt': now});
+      batch.set(codeRef, {
+        'listId': listsRef.id,
+        'createdBy': uid, // ✅ nuevo
+        'createdAt': now,
+      });
     }
 
     await batch.commit();
@@ -279,40 +284,6 @@ class ListService {
     });
   }
 
-  Future<void> deleteListViaBackend({required String listId}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('No hay sesión activa');
-    }
-
-    final token = await user.getIdToken();
-
-    // Android Emulator: usa 10.0.2.2 en vez de localhost
-    // Dispositivo físico: usa la IP local del PC
-    final uri = Uri.parse('http://10.0.2.2:3000/api/lists/$listId');
-
-    final resp = await http.delete(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    Map<String, dynamic>? data;
-    try {
-      data = jsonDecode(resp.body) as Map<String, dynamic>;
-    } catch (_) {
-      data = null;
-    }
-
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      final msg = (data?['error'] ?? 'Error HTTP ${resp.statusCode}')
-          .toString();
-      throw Exception(msg);
-    }
-  }
-
   Future<void> makeAdmin({
     required String listId,
     required String targetUid,
@@ -415,5 +386,134 @@ class ListService {
 
       tx.update(listRef, updates);
     });
+  }
+
+  static const String _baseUrl = 'http://10.0.2.2:3000';
+
+  Future<void> deleteGroupViaBackend({required String listId}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No hay sesión activa');
+
+    // Si a veces te da 401 por token viejo, usa getIdToken(true)
+    final token = await user.getIdToken();
+
+    final uri = Uri.parse('$_baseUrl/api/lists/$listId');
+
+    final resp = await http.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    Map<String, dynamic>? body;
+    try {
+      body = jsonDecode(resp.body) as Map<String, dynamic>;
+    } catch (_) {
+      body = null;
+    }
+
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      final msg = (body?['error'] ?? 'HTTP ${resp.statusCode}').toString();
+      throw Exception(msg);
+    }
+  }
+
+  Future<void> inviteByUsername({
+    required String listId,
+    required String usernameInput,
+  }) async {
+    final from = FirebaseAuth.instance.currentUser;
+    if (from == null) throw Exception('No hay sesión');
+
+    final trimmed = usernameInput.trim();
+    if (trimmed.isEmpty) throw Exception('Escribe un username');
+
+    final unameLower = trimmed.toLowerCase();
+
+    // 1) resolver uid por username
+    final unameSnap = await _db.collection('usernames').doc(unameLower).get();
+    if (!unameSnap.exists) throw Exception('Ese username no existe');
+
+    final toUid = (unameSnap.data()?['uid'] ?? '').toString();
+    if (toUid.isEmpty) throw Exception('Username inválido');
+    if (toUid == from.uid) throw Exception('No puedes invitarte a ti mismo');
+
+    // 2) cargar lista y comprobar admin
+    final listRef = _db.collection('lists').doc(listId);
+    final listSnap = await listRef.get();
+    if (!listSnap.exists) throw Exception('La lista no existe');
+
+    final data = listSnap.data()!;
+    final adminsRaw = data['admins'];
+    final admins = adminsRaw is List
+        ? adminsRaw.map((e) => e.toString()).toList()
+        : <String>[];
+    if (!admins.contains(from.uid)) {
+      throw Exception('Solo un admin puede invitar');
+    }
+
+    // 3) si ya es miembro, no invites
+    final memberUidsRaw = data['memberUids'];
+    final memberUids = memberUidsRaw is List
+        ? memberUidsRaw.map((e) => e.toString()).toList()
+        : <String>[];
+    if (memberUids.contains(toUid)) {
+      throw Exception('Ese usuario ya está en la lista');
+    }
+
+    // 4) username del que invita (opcional, para mostrar en inbox)
+    final fromUserSnap = await _db.collection('users').doc(from.uid).get();
+    final fromUsername = (fromUserSnap.data()?['username'] ?? '').toString();
+
+    final title = (data['title'] ?? '(sin título)').toString();
+
+    // 5) crear invite en inbox del receptor (docId = listId)
+    final inviteRef = _db
+        .collection('users')
+        .doc(toUid)
+        .collection('invites')
+        .doc(listId);
+    await inviteRef.set({
+      'listId': listId,
+      'listTitle': title,
+      'fromUid': from.uid,
+      'fromUsername': fromUsername,
+      'toUsername': trimmed,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<String> previewListByCode({required String rawCode}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('No hay sesión');
+
+    final normalized = _normalizeCode(rawCode);
+    if (normalized.isEmpty) throw Exception('Código vacío');
+
+    final hash = _codeHash(normalized);
+
+    // 1) resolver listId desde list_codes/{hash}
+    final codeSnap = await _db.collection('list_codes').doc(hash).get();
+    if (!codeSnap.exists) throw Exception('Código inválido');
+
+    final listId = (codeSnap.data()?['listId'] ?? '').toString();
+    if (listId.isEmpty) throw Exception('Código inválido');
+
+    // 2) crear preview_access SOLO si no existe (evita update -> permission denied)
+    final paRef = _db
+        .collection('lists')
+        .doc(listId)
+        .collection('preview_access')
+        .doc(user.uid);
+
+    final paSnap = await paRef.get();
+    if (!paSnap.exists) {
+      await paRef.set({
+        'codeHash': hash,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    return listId;
   }
 }
