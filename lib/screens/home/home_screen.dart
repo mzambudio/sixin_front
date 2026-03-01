@@ -220,14 +220,53 @@ class _HomeDrawer extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.mail_outline),
               title: const Text('Invitaciones'),
+              trailing: _InvitesBadge(),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/invitations');
+                Navigator.pushNamed(context, '/inbox');
               },
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _InvitesBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final stream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('invites')
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: stream,
+      builder: (context, snap) {
+        final count = snap.data?.size ?? 0;
+        if (count <= 0) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.error,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            count > 99 ? '99+' : '$count',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onError,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      },
     );
   }
 }

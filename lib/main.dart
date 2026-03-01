@@ -36,6 +36,7 @@ class MyApp extends StatelessWidget {
             '/register': (_) => const RegisterScreen(),
             '/profile': (_) => const ProfileScreen(),
             '/edit-profile': (_) => const EditProfileScreen(),
+            '/inbox': (_) => const InboxScreen(),
           },
         );
       },

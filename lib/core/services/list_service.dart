@@ -516,4 +516,59 @@ class ListService {
 
     return listId;
   }
+
+  Future<void> acceptInvite({
+    required String listId,
+    required String uid,
+  }) async {
+    final listRef = _db.collection('lists').doc(listId);
+    final memberRef = listRef.collection('members').doc(uid);
+    final inviteRef = _db
+        .collection('users')
+        .doc(uid)
+        .collection('invites')
+        .doc(listId);
+    final userRef = _db.collection('users').doc(uid);
+
+    await _db.runTransaction((tx) async {
+      final inviteSnap = await tx.get(inviteRef);
+      if (!inviteSnap.exists) {
+        throw Exception('La invitación ya no existe');
+      }
+
+      final listSnap = await tx.get(listRef);
+      if (!listSnap.exists) throw Exception('La lista no existe');
+
+      // Si ya es miembro, limpia invite y listo
+      final memberSnap = await tx.get(memberRef);
+      if (!memberSnap.exists) {
+        final userSnap = await tx.get(userRef);
+        final username = (userSnap.data()?['username'] ?? uid).toString();
+
+        tx.set(memberRef, {
+          'role': 'member',
+          'username': username,
+          'joinedAt': FieldValue.serverTimestamp(),
+        });
+
+        tx.update(listRef, {
+          'memberUids': FieldValue.arrayUnion([uid]),
+        });
+      }
+
+      tx.delete(inviteRef);
+    });
+  }
+
+  Future<void> rejectInvite({
+    required String listId,
+    required String uid,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('invites')
+        .doc(listId)
+        .delete();
+  }
 }

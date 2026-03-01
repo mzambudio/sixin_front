@@ -81,6 +81,15 @@ class ListDetailScreen extends StatelessWidget {
                   .doc(uid)
                   .snapshots();
 
+        final inviteDocStream = (isGuest || uid.isEmpty)
+            ? null
+            : FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .collection('invites')
+                  .doc(listId)
+                  .snapshots();
+
         return Scaffold(
           appBar: AppBar(
             title: Text((data['title'] ?? list.title).toString()),
@@ -405,66 +414,192 @@ class ListDetailScreen extends StatelessWidget {
                         // -------------------------
                         // NO MIEMBRO => UNIRSE / SOLICITAR
                         // -------------------------
-                        : (joinPolicy == 'approval' && requestDocStream != null)
+                        : (inviteDocStream != null)
                         ? StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                            stream: requestDocStream,
-                            builder: (context, reqSnap) {
-                              final pending = reqSnap.data?.exists == true;
+                            stream: inviteDocStream,
+                            builder: (context, invSnap) {
+                              final hasInvite = invSnap.data?.exists == true;
 
-                              if (pending) {
-                                // ✅ solicitud pendiente -> permitir cancelar
-                                return FilledButton.icon(
-                                  icon: const Icon(Icons.cancel),
-                                  label: const Text('Cancelar solicitud'),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.error,
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.onError,
-                                  ),
-                                  onPressed: () async {
-                                    try {
-                                      await ListService.instance
-                                          .cancelJoinRequest(
-                                            listId: listId,
-                                            uid: uid,
-                                          );
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Solicitud cancelada'),
+                              if (hasInvite) {
+                                // ✅ Invitación pendiente -> Aceptar / Rechazar
+                                return Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.close),
+                                        label: const Text('Rechazar'),
+                                        onPressed: () async {
+                                          try {
+                                            await FirebaseFirestore.instance
+                                                .collection('users')
+                                                .doc(uid)
+                                                .collection('invites')
+                                                .doc(listId)
+                                                .delete();
+
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Invitación rechazada',
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        icon: const Icon(Icons.check),
+                                        label: const Text('Aceptar invitación'),
+                                        onPressed: () async {
+                                          try {
+                                            await ListService.instance
+                                                .acceptInvite(
+                                                  listId: listId,
+                                                  uid: uid,
+                                                );
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Te has unido ✅'),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
+
+                              // ✅ Si no hay invitación, vuelve a tu lógica normal (approval/open)
+                              if (joinPolicy == 'approval' &&
+                                  requestDocStream != null) {
+                                return StreamBuilder<
+                                  DocumentSnapshot<Map<String, dynamic>>
+                                >(
+                                  stream: requestDocStream,
+                                  builder: (context, reqSnap) {
+                                    final pending =
+                                        reqSnap.data?.exists == true;
+
+                                    if (pending) {
+                                      return FilledButton.icon(
+                                        icon: const Icon(Icons.cancel),
+                                        label: const Text('Cancelar solicitud'),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                          foregroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.onError,
                                         ),
-                                      );
-                                    } catch (e) {
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(content: Text('Error: $e')),
+                                        onPressed: () async {
+                                          try {
+                                            await ListService.instance
+                                                .cancelJoinRequest(
+                                                  listId: listId,
+                                                  uid: uid,
+                                                );
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Solicitud cancelada',
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            if (!context.mounted) return;
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $e'),
+                                              ),
+                                            );
+                                          }
+                                        },
                                       );
                                     }
+
+                                    return FilledButton.icon(
+                                      icon: const Icon(Icons.send),
+                                      label: const Text('Solicitar unirme'),
+                                      onPressed: () async {
+                                        try {
+                                          await ListService.instance
+                                              .requestJoin(
+                                                listId: listId,
+                                                uid: uid,
+                                              );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Solicitud enviada ✅',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: $e'),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    );
                                   },
                                 );
                               }
 
-                              // ✅ no hay solicitud -> permitir solicitar
                               return FilledButton.icon(
-                                icon: const Icon(Icons.send),
-                                label: const Text('Solicitar unirme'),
+                                icon: const Icon(Icons.login),
+                                label: const Text('Unirme'),
                                 onPressed: () async {
                                   try {
-                                    await ListService.instance.requestJoin(
+                                    await ListService.instance.joinList(
                                       listId: listId,
                                       uid: uid,
                                     );
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Solicitud enviada ✅'),
+                                        content: Text('Te has unido ✅'),
                                       ),
                                     );
                                   } catch (e) {
@@ -477,29 +612,7 @@ class ListDetailScreen extends StatelessWidget {
                               );
                             },
                           )
-                        : FilledButton.icon(
-                            icon: const Icon(Icons.login),
-                            label: const Text('Unirme'),
-                            onPressed: () async {
-                              try {
-                                await ListService.instance.joinList(
-                                  listId: listId,
-                                  uid: uid,
-                                );
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Te has unido ✅'),
-                                  ),
-                                );
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error: $e')),
-                                );
-                              }
-                            },
-                          ),
+                        : const SizedBox.shrink(),
                   ),
                 ),
         );
@@ -778,7 +891,7 @@ class _MembersList extends StatelessWidget {
           return ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(role == 'admin' ? Icons.shield : Icons.person),
-            title: Text(username),
+            title: Text(isSelf ? '$username (tú)' : username),
             subtitle: Text(role),
             trailing: canShowMenu
                 ? PopupMenuButton<String>(

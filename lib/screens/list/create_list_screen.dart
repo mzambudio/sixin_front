@@ -156,16 +156,15 @@ class _CreateListScreenState extends State<CreateListScreen> {
 
             const SizedBox(height: 16),
             SwitchListTile(
-              title: const Text('Lista privada'),
+              title: const Text('Ocultar lista'),
               subtitle: const Text(
-                'No aparece en el feed. Se entra con código.',
+                'Oculta. Acceso con código o invitación.',
               ),
               value: _isPrivate,
               onChanged: (v) => setState(() => _isPrivate = v),
             ),
             SwitchListTile(
               title: const Text('Requiere aprobación para unirse'),
-              subtitle: const Text('Si no, el usuario entra directamente.'),
               value: _needsApproval,
               onChanged: (v) => setState(() => _needsApproval = v),
             ),
