@@ -37,6 +37,7 @@ class MyApp extends StatelessWidget {
             '/profile': (_) => const ProfileScreen(),
             '/edit-profile': (_) => const EditProfileScreen(),
             '/inbox': (_) => const InboxScreen(),
+            '/options': (_) => const OptionsScreen(),
           },
         );
       },

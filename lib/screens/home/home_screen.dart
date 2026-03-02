@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../screens.dart';
 import '../../models/models.dart';
 import '../../core/services/services.dart';
+import '../../widgets/common/invites_badge_icon.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
@@ -96,14 +97,6 @@ class _HomeScreenState extends State<HomeScreen>
     final theme = Theme.of(context);
     final isGuest = widget.isGuest;
     final authUser = FirebaseAuth.instance.currentUser;
-    final user = FirebaseAuth.instance.currentUser;
-    final invitesStream = user != null
-        ? FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('invites')
-              .snapshots()
-        : null;
 
     return Scaffold(
       drawer: isGuest ? null : _HomeDrawer(),
@@ -112,58 +105,10 @@ class _HomeScreenState extends State<HomeScreen>
         leading: isGuest
             ? null
             : Builder(
-                builder: (context) {
-                  return invitesStream == null
-                      ? IconButton(
-                          tooltip: 'Menú',
-                          icon: const Icon(Icons.person),
-                          onPressed: () => Scaffold.of(context).openDrawer(),
-                        )
-                      : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: invitesStream,
-                          builder: (context, snap) {
-                            final count = snap.data?.docs.length ?? 0;
-                            final hasInvites = count > 0;
-
-                            return IconButton(
-                              tooltip: 'Menú',
-                              onPressed: () =>
-                                  Scaffold.of(context).openDrawer(),
-                              icon: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  const Icon(Icons.person),
-                                  if (hasInvites)
-                                    Positioned(
-                                      right: -6,
-                                      top: -6,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.error,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        constraints: const BoxConstraints(
-                                          minWidth: 18,
-                                          minHeight: 18,
-                                        ),
-                                        child: Text(
-                                          count > 9 ? '9+' : count.toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                },
+                builder: (context) => InvitesBadgeIcon(
+                  tooltip: 'Menú',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
               ),
         actions: [
           IconButton(
@@ -264,6 +209,8 @@ class _HomeDrawer extends StatelessWidget {
           children: [
             const ListTile(leading: Icon(Icons.person), title: Text('Menú')),
             const Divider(height: 1),
+
+            // Perfil
             ListTile(
               leading: const Icon(Icons.account_circle),
               title: const Text('Perfil'),
@@ -272,15 +219,21 @@ class _HomeDrawer extends StatelessWidget {
                 Navigator.pushNamed(context, '/profile');
               },
             ),
+
+            // Invitaciones
             ListTile(
-              leading: const Icon(Icons.mail_outline),
+              leading: InvitesBadgeIcon(
+                icon: Icons.mail,
+                tooltip: 'Invitaciones',
+                asButton: false,
+              ),
               title: const Text('Invitaciones'),
-              trailing: _InvitesBadge(),
               onTap: () {
-                Navigator.pop(context);
                 Navigator.pushNamed(context, '/inbox');
               },
             ),
+
+            // Opciones
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Opciones'),
@@ -295,44 +248,6 @@ class _HomeDrawer extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _InvitesBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const SizedBox.shrink();
-
-    final stream = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('invites')
-        .snapshots();
-
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: stream,
-      builder: (context, snap) {
-        final count = snap.data?.size ?? 0;
-        if (count <= 0) return const SizedBox.shrink();
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.error,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            count > 99 ? '99+' : '$count',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onError,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        );
-      },
     );
   }
 }
