@@ -96,6 +96,14 @@ class _HomeScreenState extends State<HomeScreen>
     final theme = Theme.of(context);
     final isGuest = widget.isGuest;
     final authUser = FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
+    final invitesStream = user != null
+        ? FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('invites')
+              .snapshots()
+        : null;
 
     return Scaffold(
       drawer: isGuest ? null : _HomeDrawer(),
@@ -104,11 +112,58 @@ class _HomeScreenState extends State<HomeScreen>
         leading: isGuest
             ? null
             : Builder(
-                builder: (context) => IconButton(
-                  tooltip: 'Menú',
-                  icon: const Icon(Icons.person),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
+                builder: (context) {
+                  return invitesStream == null
+                      ? IconButton(
+                          tooltip: 'Menú',
+                          icon: const Icon(Icons.person),
+                          onPressed: () => Scaffold.of(context).openDrawer(),
+                        )
+                      : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: invitesStream,
+                          builder: (context, snap) {
+                            final count = snap.data?.docs.length ?? 0;
+                            final hasInvites = count > 0;
+
+                            return IconButton(
+                              tooltip: 'Menú',
+                              onPressed: () =>
+                                  Scaffold.of(context).openDrawer(),
+                              icon: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  const Icon(Icons.person),
+                                  if (hasInvites)
+                                    Positioned(
+                                      right: -6,
+                                      top: -6,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.error,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 18,
+                                          minHeight: 18,
+                                        ),
+                                        child: Text(
+                                          count > 9 ? '9+' : count.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                },
               ),
         actions: [
           IconButton(
@@ -213,7 +268,7 @@ class _HomeDrawer extends StatelessWidget {
               leading: const Icon(Icons.account_circle),
               title: const Text('Perfil'),
               onTap: () {
-                Navigator.pop(context); // cierra el drawer
+                Navigator.pop(context);
                 Navigator.pushNamed(context, '/profile');
               },
             ),
@@ -224,6 +279,17 @@ class _HomeDrawer extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/inbox');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Opciones'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(
+                  context,
+                  '/options',
+                ); // TODO: crear pantalla de opciones
               },
             ),
           ],
