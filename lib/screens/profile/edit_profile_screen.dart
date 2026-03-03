@@ -244,6 +244,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       children: [
                         for (final p in volleyPositions)
                           FilterChip(
+                            showCheckmark: false,
                             label: Text(
                               '${p.abbr(positionsLang)} • ${p.name(positionsLang)}',
                             ),

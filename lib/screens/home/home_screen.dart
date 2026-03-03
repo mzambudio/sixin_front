@@ -94,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isGuest = widget.isGuest;
     final authUser = FirebaseAuth.instance.currentUser;
 

@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'edit_profile_screen.dart';
 import 'package:sixin_front/core/services/profile_service.dart';
+import 'package:sixin_front/core/settings/settings_controller.dart';
+import 'package:sixin_front/core/constants/volley_positions.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -115,27 +117,59 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              // Card(
-              //   child: ListTile(
-              //     leading: const Icon(Icons.fingerprint),
-              //     title: const Text('UID'),
-              //     subtitle: Text(authUser.uid),
-              //   ),
-              // ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.security),
-                  title: const Text('Positions'),
-                  subtitle: positions.isEmpty
-                      ? const Text('—')
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: positions
-                              .map((p) => Chip(label: Text(p.toUpperCase())))
-                              .toList(),
-                        ),
-                ),
+              ValueListenableBuilder<String>(
+                valueListenable: SettingsController.instance.positionsLang,
+                builder: (context, langStr, _) {
+                  final lang = (langStr == 'en')
+                      ? PositionsLang.en
+                      : PositionsLang.es;
+
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.security),
+                      title: Text(
+                        lang == PositionsLang.es ? 'Posiciones' : 'Positions',
+                      ),
+                      subtitle: positions.isEmpty
+                          ? const Text('—')
+                          : Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: positions.map((id) {
+                                final p = volleyPositions
+                                    .where((x) => x.id == id)
+                                    .cast<VolleyPosition?>()
+                                    .firstWhere(
+                                      (x) => x != null,
+                                      orElse: () => null,
+                                    );
+
+                                // Fallback por si hay datos raros:
+                                final label = p == null
+                                    ? id.toUpperCase()
+                                    : p.abbr(lang);
+
+                                return Tooltip(
+                                  message: p == null
+                                      ? id.toUpperCase()
+                                      : p.name(lang),
+                                  waitDuration: const Duration(
+                                    milliseconds: 350,
+                                  ),
+                                  showDuration: const Duration(seconds: 2),
+                                  child: Chip(
+                                    label: Text(
+                                      p == null
+                                          ? id.toUpperCase()
+                                          : p.abbr(lang),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                    ),
+                  );
+                },
               ),
               Card(
                 child: ListTile(
