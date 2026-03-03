@@ -144,11 +144,6 @@ class ProfileScreen extends StatelessWidget {
                                       orElse: () => null,
                                     );
 
-                                // Fallback por si hay datos raros:
-                                final label = p == null
-                                    ? id.toUpperCase()
-                                    : p.abbr(lang);
-
                                 return Tooltip(
                                   message: p == null
                                       ? id.toUpperCase()

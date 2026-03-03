@@ -621,6 +621,7 @@ class ListDetailScreen extends StatelessWidget {
   }
 }
 
+// Hoja modal que muestra las solicitudes pendientes, con opción a aprobar/rechazar (solo para admins)
 class _RequestsSheet extends StatelessWidget {
   final String listId;
 
