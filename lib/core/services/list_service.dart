@@ -52,7 +52,11 @@ class ListService {
   Future<String?> createList({
     required String uid,
     required String ownerUsername, // guárdalo para mostrarlo en Home sin joins
-    required String title,
+    required String place,
+    required DateTime startAt,
+    required double? totalPrice,
+    required List<String> levels,
+    required List<String> systems,
     required String visibility, // "public" | "private"
     required String joinPolicy, // "open" | "approval"
     String? description,
@@ -77,7 +81,12 @@ class ListService {
     final batch = _db.batch();
 
     batch.set(listsRef, {
-      'title': title.trim(),
+      'place': place.trim(),
+      'startAt': Timestamp.fromDate(startAt),
+       if(totalPrice != null) 'totalPrice': totalPrice,
+      'currency': 'EUR',
+      'systems': systems..sort(),
+      'levels': levels..sort(),
       'description': (description ?? '').trim(),
       'createdBy': uid,
       'admins': [uid],
@@ -464,7 +473,7 @@ class ListService {
     final fromUserSnap = await _db.collection('users').doc(from.uid).get();
     final fromUsername = (fromUserSnap.data()?['username'] ?? '').toString();
 
-    final title = (data['title'] ?? '(sin título)').toString();
+    final place = (data['place'] ?? '(sin lugar)').toString();
 
     // 5) crear invite en inbox del receptor (docId = listId)
     final inviteRef = _db
@@ -474,7 +483,7 @@ class ListService {
         .doc(listId);
     await inviteRef.set({
       'listId': listId,
-      'listTitle': title,
+      'listPlace': place,
       'fromUid': from.uid,
       'fromUsername': fromUsername,
       'toUsername': trimmed,

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:sixin_front/utils/list_formatters.dart';
 import '../screens.dart';
 import '../../models/models.dart';
 import '../../core/services/services.dart';
@@ -72,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
 
       final placeholder = SixinList(
         id: listId,
-        title: 'Cargando...',
+        title: 'Lista',
         ownerName: '—',
         isPublic: false,
         items: const [],
@@ -286,7 +287,7 @@ class _PublicListsTab extends StatelessWidget {
             final createdBy = (data['createdBy'] ?? '') as String;
             final isOwner = uid != null && createdBy == uid;
 
-            final title = (data['title'] ?? '(sin título)') as String;
+            final title = buildListTitle(data);
             final owner = (data['ownerUsername'] ?? '—') as String;
             final membersRaw = data['memberUids'];
             final memberUids = membersRaw is List
@@ -399,7 +400,7 @@ class _MyListsTab extends StatelessWidget {
             final createdBy = (data['createdBy'] ?? '') as String;
             final isOwner = createdBy == uid;
 
-            final title = (data['title'] ?? '(sin título)') as String;
+            final title = buildListTitle(data);
             final owner = (data['ownerUsername'] ?? '—') as String;
 
             final list = SixinList(
