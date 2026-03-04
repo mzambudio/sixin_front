@@ -126,54 +126,6 @@ class ListDetailScreen extends StatelessWidget {
                   tooltip: 'Configuración',
                   icon: const Icon(Icons.settings),
                   onSelected: (value) async {
-                    // Mostrar código de acceso (solo si es privado)
-                    if (value == 'show_code') {
-                      await showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('Código del grupo'),
-                          content: Row(
-                            children: [
-                              Expanded(
-                                child: SelectableText(
-                                  joinCode.isEmpty ? '—' : joinCode,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Copiar',
-                                icon: const Icon(Icons.copy),
-                                onPressed: joinCode.isEmpty
-                                    ? null
-                                    : () async {
-                                        await Clipboard.setData(
-                                          ClipboardData(text: joinCode),
-                                        );
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Código copiado ✅'),
-                                          ),
-                                        );
-                                      },
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cerrar'),
-                            ),
-                          ],
-                        ),
-                      );
-                      return;
-                    }
                     // Borrar grupo
                     if (value == 'delete_group') {
                       final ok = await showDialog<bool>(
@@ -217,11 +169,6 @@ class ListDetailScreen extends StatelessWidget {
                     }
                   },
                   itemBuilder: (context) => [
-                    if (isPrivate)
-                      const PopupMenuItem(
-                        value: 'show_code',
-                        child: Text('Ver código'),
-                      ),
                     const PopupMenuItem(
                       value: 'delete_group',
                       child: Text('Borrar grupo'),
