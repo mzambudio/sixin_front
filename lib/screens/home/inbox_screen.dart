@@ -46,35 +46,62 @@ class InboxScreen extends StatelessWidget {
               final data = d.data();
 
               final listId = (data['listId'] ?? d.id).toString();
-              final listTitle = (data['listTitle'] ?? '(sin título)')
-                  .toString();
+              final place = (data['listPlace'] ?? '—').toString();
               final fromUsername = (data['fromUsername'] ?? '—').toString();
+              final startAtRaw = data['startAt'];
+              final startAt = startAtRaw is Timestamp
+                  ? startAtRaw.toDate()
+                  : null;
+
+              String two(int n) => n.toString().padLeft(2, '0');
+
+              final timeText = startAt == null
+                  ? '—'
+                  : '${two(startAt.toLocal().hour)}:${two(startAt.toLocal().minute)}';
+
+              final dateText = startAt == null
+                  ? '—'
+                  : '${two(startAt.toLocal().day)}/${two(startAt.toLocal().month)}/${startAt.toLocal().year}';
 
               return Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    title: Text(listTitle),
-                    subtitle: Text('Invitado por $fromUsername'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      final placeholder = SixinList(
-                        id: listId,
-                        title: listTitle,
-                        ownerName: '—',
-                        isPublic: false,
-                        items: const [],
-                      );
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ListDetailScreen(
-                            list: placeholder,
-                            isGuest: false,
-                          ),
-                        ),
-                      );
-                    },
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    final placeholder = SixinList(
+                      id: listId,
+                      title: '$place • $timeText',
+                      ownerName: '—',
+                      isPublic: false,
+                      items: const [],
+                    );
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ListDetailScreen(list: placeholder, isGuest: false),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: ListTile(
+                      title: Text(place),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          if (startAt != null)
+                            Text(
+                              '$dateText • $timeText',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          const SizedBox(height: 4),
+                          Text('Invitado por $fromUsername'),
+                        ],
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    ),
                   ),
                 ),
               );

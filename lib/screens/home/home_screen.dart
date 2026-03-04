@@ -242,7 +242,7 @@ class _HomeDrawer extends StatelessWidget {
                 Navigator.pushNamed(
                   context,
                   '/options',
-                ); // TODO: crear pantalla de opciones
+                );
               },
             ),
           ],
@@ -276,23 +276,34 @@ class _PublicListsTab extends StatelessWidget {
           return const Center(child: Text('No hay listas públicas'));
         }
 
+        final rows = buildDaySections(docs);
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
+          itemCount: rows.length,
           itemBuilder: (context, i) {
-            final d = docs[i];
+            final row = rows[i];
+
+            if (row.isHeader) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Text(
+                  row.headerText,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              );
+            }
+
+            final d = row.doc!;
             final data = d.data();
+
             final user = FirebaseAuth.instance.currentUser;
             final uid = user?.uid;
             final createdBy = (data['createdBy'] ?? '') as String;
             final isOwner = uid != null && createdBy == uid;
 
-            final title = buildListTitle(data);
+            final title = buildListTitleShort(data); // ✅ lugar + hora
             final owner = (data['ownerUsername'] ?? '—') as String;
-            final membersRaw = data['memberUids'];
-            final memberUids = membersRaw is List
-                ? membersRaw.map((e) => e.toString()).toList()
-                : <String>[];
 
             final list = SixinList(
               id: d.id,
@@ -306,48 +317,11 @@ class _PublicListsTab extends StatelessWidget {
                 ? 'Creada por ti (${list.ownerName})'
                 : 'Creada por ${list.ownerName}';
 
-            final isMember = uid != null && memberUids.contains(uid);
-
-            final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
-
             return Card(
               child: ListTile(
                 title: Text(list.title),
                 subtitle: Text(subtitleText),
-                trailing: isGuest
-                    ? const Icon(Icons.visibility)
-                    : isMember
-                    ? const Icon(
-                        Icons.check_circle,
-                        semanticLabel: 'Ya eres miembro',
-                      )
-                    : (joinPolicy == 'approval' && uid != null)
-                    ? _JoinRequestTrailing(listId: d.id, uid: uid)
-                    : TextButton(
-                        onPressed: () async {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user == null) return;
-
-                          try {
-                            await ListService.instance.joinList(
-                              listId: d.id,
-                              uid: user.uid,
-                            );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Te has unido ✅')),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e')),
-                              );
-                            }
-                          }
-                        },
-                        child: const Text('Unirse'),
-                      ),
+                trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -391,16 +365,31 @@ class _MyListsTab extends StatelessWidget {
           return const Center(child: Text('Aún no estás en ninguna lista'));
         }
 
+        final rows = buildDaySections(docs);
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
+          itemCount: rows.length,
           itemBuilder: (context, i) {
-            final d = docs[i];
+            final row = rows[i];
+
+            if (row.isHeader) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Text(
+                  row.headerText,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              );
+            }
+
+            final d = row.doc!;
             final data = d.data();
+
             final createdBy = (data['createdBy'] ?? '') as String;
             final isOwner = createdBy == uid;
 
-            final title = buildListTitle(data);
+            final title = buildListTitleShort(data); // ✅ lugar + hora
             final owner = (data['ownerUsername'] ?? '—') as String;
 
             final list = SixinList(
@@ -438,85 +427,45 @@ class _MyListsTab extends StatelessWidget {
   }
 }
 
-class _JoinRequestTrailing extends StatelessWidget {
-  final String listId;
-  final String uid;
+/// Helper para construir la lista de secciones (header + items) a partir de los docs, agrupando por día
+class _SectionRow {
+  final bool isHeader;
+  final String headerText;
+  final QueryDocumentSnapshot<Map<String, dynamic>>? doc;
 
-  const _JoinRequestTrailing({required this.listId, required this.uid});
+  _SectionRow.header(this.headerText) : isHeader = true, doc = null;
 
-  @override
-  Widget build(BuildContext context) {
-    final reqDocStream = FirebaseFirestore.instance
-        .collection('lists')
-        .doc(listId)
-        .collection('requests')
-        .doc(uid)
-        .snapshots();
+  _SectionRow.item(this.doc) : isHeader = false, headerText = '';
+}
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: reqDocStream,
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const TextButton(onPressed: null, child: Text('...'));
-        }
+List<_SectionRow> buildDaySections(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+) {
+  // Ordena por startAt asc (si no viene ordenado ya por query)
+  docs.sort((a, b) {
+    final ta = (a.data()['startAt'] as Timestamp?)?.toDate();
+    final tb = (b.data()['startAt'] as Timestamp?)?.toDate();
+    if (ta == null && tb == null) return 0;
+    if (ta == null) return 1;
+    if (tb == null) return -1;
+    return ta.compareTo(tb);
+  });
 
-        final doc = snap.data!;
-        final pending = doc.exists;
+  final out = <_SectionRow>[];
+  String? currentKey;
 
-        if (pending) {
-          return TextButton(
-            onPressed: () async {
-              final user = FirebaseAuth.instance.currentUser;
-              if (user == null) return;
+  for (final d in docs) {
+    final start = readStartAt(d.data())?.toLocal();
+    final key = start == null ? 'sin-fecha' : dayKey(start);
 
-              try {
-                await ListService.instance.cancelJoinRequest(
-                  listId: listId,
-                  uid: user.uid,
-                );
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Solicitud cancelada')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            child: const Text('Cancelar'),
-          );
-        }
+    if (key != currentKey) {
+      currentKey = key;
+      final header = start == null ? 'Sin fecha' : dayHeaderEs(start);
+      out.add(_SectionRow.header(header));
+    }
 
-        return TextButton(
-          onPressed: () async {
-            final user = FirebaseAuth.instance.currentUser;
-            if (user == null) return;
-
-            try {
-              await ListService.instance.requestJoin(
-                listId: listId,
-                uid: user.uid,
-              );
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Solicitud enviada ✅')),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            }
-          },
-          child: const Text('Solicitar'),
-        );
-      },
-    );
+    out.add(_SectionRow.item(d));
   }
+
+  return out;
 }

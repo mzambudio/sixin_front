@@ -15,7 +15,7 @@ class ListService {
     return _db
         .collection('lists')
         .where('visibility', isEqualTo: 'public')
-        .orderBy('createdAt', descending: true)
+        .orderBy('startAt')
         .snapshots();
   }
 
@@ -23,7 +23,7 @@ class ListService {
     return _db
         .collection('lists')
         .where('memberUids', arrayContains: uid)
-        .orderBy('createdAt', descending: true)
+        .orderBy('startAt')
         .snapshots();
   }
 
@@ -83,10 +83,10 @@ class ListService {
     batch.set(listsRef, {
       'place': place.trim(),
       'startAt': Timestamp.fromDate(startAt),
-       if(totalPrice != null) 'totalPrice': totalPrice,
+      if (totalPrice != null) 'totalPrice': totalPrice,
       'currency': 'EUR',
-      'systems': systems..sort(),
-      'levels': levels..sort(),
+      'systems': [...systems]..sort(),
+      'levels': [...levels]..sort(),
       'description': (description ?? '').trim(),
       'createdBy': uid,
       'admins': [uid],
@@ -276,6 +276,20 @@ class ListService {
       final listSnap = await tx.get(listRef);
       if (!listSnap.exists) throw Exception('La lista no existe');
 
+      final data = listSnap.data()!;
+      final adminsRaw = data['admins'];
+
+      final admins = adminsRaw is List
+          ? adminsRaw.map((e) => e.toString()).toList()
+          : <String>[];
+
+      final isTargetAdmin = admins.contains(targetUid);
+
+      // Si el objetivo es admin, no dejes la lista sin admins
+      if (isTargetAdmin && admins.length <= 1) {
+        throw Exception('No puedes expulsar al último administrador.');
+      }
+
       final memberSnap = await tx.get(memberRef);
       final reqSnap = await tx.get(reqRef);
 
@@ -287,9 +301,17 @@ class ListService {
         tx.delete(reqRef);
       }
 
-      tx.update(listRef, {
+      // Updates del doc principal
+      final updates = <String, dynamic>{
         'memberUids': FieldValue.arrayRemove([targetUid]),
-      });
+      };
+
+      // Quitar de admins si era admin
+      if (isTargetAdmin) {
+        updates['admins'] = FieldValue.arrayRemove([targetUid]);
+      }
+
+      tx.update(listRef, updates);
     });
   }
 
@@ -307,7 +329,6 @@ class ListService {
       final memberSnap = await tx.get(memberRef);
       if (!memberSnap.exists) throw Exception('Ese usuario no es miembro');
 
-      // WRITES después
       tx.update(memberRef, {'role': 'admin'});
       tx.update(listRef, {
         'admins': FieldValue.arrayUnion([targetUid]),
@@ -475,6 +496,9 @@ class ListService {
 
     final place = (data['place'] ?? '(sin lugar)').toString();
 
+    final startAtRaw = data['startAt'];
+    final Timestamp? startAt = startAtRaw is Timestamp ? startAtRaw : null;
+
     // 5) crear invite en inbox del receptor (docId = listId)
     final inviteRef = _db
         .collection('users')
@@ -484,6 +508,7 @@ class ListService {
     await inviteRef.set({
       'listId': listId,
       'listPlace': place,
+      if (startAt != null) 'startAt': startAt,
       'fromUid': from.uid,
       'fromUsername': fromUsername,
       'toUsername': trimmed,

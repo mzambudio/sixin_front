@@ -49,6 +49,18 @@ class ListDetailScreen extends StatelessWidget {
           );
         }
 
+        final place = (data['place'] ?? '').toString();
+
+        final startAtRaw = data['startAt'];
+        final startAt = startAtRaw is Timestamp ? startAtRaw.toDate() : null;
+
+        String formatTime(DateTime d) =>
+            '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+        final appTitle = (place.isNotEmpty && startAt != null)
+            ? '$place • ${formatTime(startAt.toLocal())}'
+            : (place.isNotEmpty ? place : list.title);
+
         final joinPolicy = (data['joinPolicy'] ?? 'open') as String;
         final visibility = (data['visibility'] ?? 'public') as String;
         final joinCode = (data['joinCode'] ?? '').toString();
@@ -92,7 +104,7 @@ class ListDetailScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text((data['title'] ?? list.title).toString()),
+            title: Text(appTitle),
             actions: [
               // Solicitudes
               if (canSeeRequests)
@@ -339,9 +351,6 @@ class ListDetailScreen extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: isMember
-                        // -------------------------
-                        // MIEMBRO => SALIR (ROJO)
-                        // -------------------------
                         ? FilledButton.icon(
                             icon: const Icon(Icons.exit_to_app),
                             label: const Text('Salir del grupo'),
@@ -411,17 +420,12 @@ class ListDetailScreen extends StatelessWidget {
                               }
                             },
                           )
-                        // -------------------------
-                        // NO MIEMBRO => UNIRSE / SOLICITAR
-                        // -------------------------
-                        : (inviteDocStream != null)
-                        ? StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                             stream: inviteDocStream,
                             builder: (context, invSnap) {
                               final hasInvite = invSnap.data?.exists == true;
 
                               if (hasInvite) {
-                                // ✅ Invitación pendiente -> Aceptar / Rechazar
                                 return Row(
                                   children: [
                                     Expanded(
@@ -430,12 +434,11 @@ class ListDetailScreen extends StatelessWidget {
                                         label: const Text('Rechazar'),
                                         onPressed: () async {
                                           try {
-                                            await FirebaseFirestore.instance
-                                                .collection('users')
-                                                .doc(uid)
-                                                .collection('invites')
-                                                .doc(listId)
-                                                .delete();
+                                            await ListService.instance
+                                                .rejectInvite(
+                                                  listId: listId,
+                                                  uid: uid,
+                                                );
 
                                             if (!context.mounted) return;
                                             ScaffoldMessenger.of(
@@ -447,6 +450,7 @@ class ListDetailScreen extends StatelessWidget {
                                                 ),
                                               ),
                                             );
+                                            Navigator.pop(context);
                                           } catch (e) {
                                             if (!context.mounted) return;
                                             ScaffoldMessenger.of(
@@ -472,6 +476,7 @@ class ListDetailScreen extends StatelessWidget {
                                                   listId: listId,
                                                   uid: uid,
                                                 );
+
                                             if (!context.mounted) return;
                                             ScaffoldMessenger.of(
                                               context,
@@ -497,7 +502,6 @@ class ListDetailScreen extends StatelessWidget {
                                 );
                               }
 
-                              // ✅ Si no hay invitación, vuelve a tu lógica normal (approval/open)
                               if (joinPolicy == 'approval' &&
                                   requestDocStream != null) {
                                 return StreamBuilder<
@@ -611,8 +615,7 @@ class ListDetailScreen extends StatelessWidget {
                                 },
                               );
                             },
-                          )
-                        : const SizedBox.shrink(),
+                          ),
                   ),
                 ),
         );
@@ -1033,14 +1036,14 @@ class _MembersList extends StatelessWidget {
                         items.add(
                           const PopupMenuItem(
                             value: 'demote_admin',
-                            child: Text('Dejar de ser admin'),
+                            child: Text('Descartar como admin'),
                           ),
                         );
                       } else {
                         items.add(
                           const PopupMenuItem(
                             value: 'make_admin',
-                            child: Text('Hacer admin'),
+                            child: Text('Designar como admin'),
                           ),
                         );
                       }
