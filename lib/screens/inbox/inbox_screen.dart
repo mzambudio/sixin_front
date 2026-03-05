@@ -23,7 +23,7 @@ class InboxScreen extends StatelessWidget {
         .snapshots();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Invitaciones')),
+      appBar: AppBar(title: const Text('Buzón')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: invitesStream,
         builder: (context, snap) {
