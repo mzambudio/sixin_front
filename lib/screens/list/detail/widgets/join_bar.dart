@@ -83,78 +83,43 @@ class _LeaveButton extends StatelessWidget {
         foregroundColor: Theme.of(context).colorScheme.onError,
       ),
       onPressed: () async {
-        // ✅ Caso especial: eres el único miembro -> borrar lista
         if (isOnlyMember) {
-          final ok = await showDialog<bool>(
-            context: context,
-            builder: (_) => AlertDialog(
-              title: const Text('Borrar lista'),
-              content: const Text(
+          final ok = await _confirm(
+            context,
+            title: 'Borrar lista',
+            message:
                 'Eres el único miembro. Si sales, la lista se borrará. ¿Continuar?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Borrar'),
-                ),
-              ],
-            ),
+            okText: 'Borrar',
           );
-
-          if (ok != true) return;
+          if (!ok) return;
 
           try {
             await ListService.instance.deleteGroupViaBackend(listId: listId);
-
             if (!context.mounted) return;
             Navigator.pop(context);
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Lista borrada ✅')));
+            _snack(context, 'Lista borrada ✅');
           } catch (e) {
             if (!context.mounted) return;
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Error: $e')));
+            _snack(context, 'Error: $e');
           }
           return;
         }
 
-        // Regla existente: impedir que el único admin se vaya (cuando hay más miembros)
         if (isOnlyAdmin) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Eres el único admin. Designa a otro admin antes de salir.',
-              ),
-            ),
+          _snack(
+            context,
+            'Eres el único admin. Designa a otro admin antes de salir.',
           );
           return;
         }
 
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Salir del grupo'),
-            content: const Text('¿Quieres salir de este grupo?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Salir'),
-              ),
-            ],
-          ),
+        final ok = await _confirm(
+          context,
+          title: 'Salir del grupo',
+          message: '¿Quieres salir de este grupo?',
+          okText: 'Salir',
         );
-
-        if (ok != true) return;
+        if (!ok) return;
 
         try {
           await ListService.instance.leaveList(
@@ -162,17 +127,12 @@ class _LeaveButton extends StatelessWidget {
             uid: uid,
             wasAdmin: wasAdmin,
           );
-
           if (!context.mounted) return;
           Navigator.pop(context);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Has salido del grupo')));
+          _snack(context, 'Has salido del grupo');
         } catch (e) {
           if (!context.mounted) return;
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          _snack(context, 'Error: $e');
         }
       },
     );
@@ -209,25 +169,15 @@ class _JoinArea extends StatelessWidget {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.close),
                   label: const Text('Rechazar'),
-                  onPressed: () async {
-                    try {
-                      await ListService.instance.rejectInvite(
-                        listId: listId,
-                        uid: uid,
-                      );
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invitación rechazada')),
-                      );
-                      Navigator.pop(context);
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  },
+                  onPressed: () => _runAction(
+                    context,
+                    () => ListService.instance.rejectInvite(
+                      listId: listId,
+                      uid: uid,
+                    ),
+                    successMsg: 'Invitación rechazada',
+                    onSuccess: () => Navigator.pop(context),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -235,24 +185,14 @@ class _JoinArea extends StatelessWidget {
                 child: FilledButton.icon(
                   icon: const Icon(Icons.check),
                   label: const Text('Aceptar invitación'),
-                  onPressed: () async {
-                    try {
-                      await ListService.instance.acceptInvite(
-                        listId: listId,
-                        uid: uid,
-                      );
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Te has unido ✅')),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  },
+                  onPressed: () => _runAction(
+                    context,
+                    () => ListService.instance.acceptInvite(
+                      listId: listId,
+                      uid: uid,
+                    ),
+                    successMsg: 'Te has unido ✅',
+                  ),
                 ),
               ),
             ],
@@ -273,74 +213,91 @@ class _JoinArea extends StatelessWidget {
                     backgroundColor: Theme.of(context).colorScheme.error,
                     foregroundColor: Theme.of(context).colorScheme.onError,
                   ),
-                  onPressed: () async {
-                    try {
-                      await ListService.instance.cancelJoinRequest(
-                        listId: listId,
-                        uid: uid,
-                      );
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Solicitud cancelada')),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  },
+                  onPressed: () => _runAction(
+                    context,
+                    () => ListService.instance.cancelJoinRequest(
+                      listId: listId,
+                      uid: uid,
+                    ),
+                    successMsg: 'Solicitud cancelada',
+                  ),
                 );
               }
 
               return FilledButton.icon(
                 icon: const Icon(Icons.send),
                 label: const Text('Solicitar unirme'),
-                onPressed: () async {
-                  try {
-                    await ListService.instance.requestJoin(
-                      listId: listId,
-                      uid: uid,
-                    );
-                    if (!context.mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Solicitud enviada ✅')),
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                },
+                onPressed: () => _runAction(
+                  context,
+                  () => ListService.instance.requestJoin(
+                    listId: listId,
+                    uid: uid,
+                  ),
+                  successMsg: 'Solicitud enviada ✅',
+                ),
               );
             },
           );
         }
 
-        // joinPolicy == 'open'
+        // Si joinPolicy == 'open'
         return FilledButton.icon(
           icon: const Icon(Icons.login),
           label: const Text('Unirme'),
-          onPressed: () async {
-            try {
-              await ListService.instance.joinList(listId: listId, uid: uid);
-              if (!context.mounted) return;
-
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Te has unido ✅')));
-            } catch (e) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-            }
-          },
+          onPressed: () => _runAction(
+            context,
+            () => ListService.instance.joinList(listId: listId, uid: uid),
+            successMsg: 'Te has unido ✅',
+          ),
         );
       },
     );
+  }
+}
+
+Future<bool> _confirm(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String okText,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(okText),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
+
+void _snack(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+}
+
+Future<void> _runAction(
+  BuildContext context,
+  Future<void> Function() action, {
+  String? successMsg,
+  VoidCallback? onSuccess,
+}) async {
+  try {
+    await action();
+    if (!context.mounted) return;
+    if (successMsg != null) _snack(context, successMsg);
+    onSuccess?.call();
+  } catch (e) {
+    if (!context.mounted) return;
+    _snack(context, 'Error: $e');
   }
 }
