@@ -13,7 +13,6 @@ class OptionsScreen extends StatelessWidget {
       body: StreamBuilder<Map<String, dynamic>>(
         stream: SettingsService.instance.watchUi(),
         builder: (context, snap) {
-
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -22,10 +21,7 @@ class OptionsScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              Text(
-                'Español: ',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              Text('Español: ', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 8),
               ValueListenableBuilder<String>(
                 valueListenable: SettingsController.instance.positionsLang,

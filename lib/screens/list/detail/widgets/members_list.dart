@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sixin_front/core/services/list_service.dart';
-import 'package:sixin_front/screens/profile/user/user_profile_screen.dart';
+import 'package:sixin_front/core/settings/settings_controller.dart';
+import 'package:sixin_front/screens/profile/member/user_profile_screen.dart';
+import 'widgets.dart';
 
 class MembersList extends StatelessWidget {
   final String listId;
@@ -67,6 +69,8 @@ class MembersList extends StatelessWidget {
           final username = (data['username'] ?? memberUid).toString();
           final role = (data['role'] ?? 'member').toString();
           final isSelf = memberUid == currentUid;
+          final preferredRaw = (data['preferredPosition'] ?? '').toString();
+          final preferredId = preferredRaw.isEmpty ? null : preferredRaw;
 
           // Menú disponible:
           // - para admins: degradar a otros admins y (si quieres) expulsar
@@ -74,13 +78,46 @@ class MembersList extends StatelessWidget {
 
           return ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              role == 'admin'
-                  ? Icons.sports_volleyball
-                  : Icons.sports_volleyball_outlined,
+            leading: ValueListenableBuilder<String>(
+              valueListenable: SettingsController.instance.positionsLang,
+              builder: (context, langStr, _) {
+                final lang = langFromSetting(langStr);
+                final text = positionAbbr(preferredId, lang);
+
+                // Solo el propio usuario cambia su preferencia
+                if (isSelf) {
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () async {
+                      final picked = await showPositionPickerDialog(
+                        context,
+                        currentId: preferredId,
+                      );
+                      if (picked == null) return;
+
+                      try {
+                        await FirebaseFirestore.instance
+                            .collection('lists')
+                            .doc(listId)
+                            .collection('members')
+                            .doc(currentUid)
+                            .update({'preferredPosition': picked});
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      }
+                    },
+                    child: PositionBadge(text: text, clickable: true),
+                  );
+                }
+
+                return PositionBadge(text: text);
+              },
             ),
             title: Text(isSelf ? '$username (tú)' : username),
-            subtitle: Text(role),
+            //subtitle: Text(role),
             trailing: canShowMenu
                 ? PopupMenuButton<String>(
                     tooltip: 'Acciones',

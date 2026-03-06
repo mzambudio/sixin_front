@@ -4,3 +4,6 @@ export 'members_list.dart';
 export 'join_bar.dart';
 export 'invite_fab.dart';
 export 'settings_menu.dart';
+export 'position_picker_dialog.dart';
+export 'position_badge.dart';
+export 'position_text.dart';
