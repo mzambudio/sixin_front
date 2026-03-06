@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/screens/profile/user/user_profile_screen.dart';
 
 class MembersList extends StatelessWidget {
   final String listId;
@@ -58,8 +59,6 @@ class MembersList extends StatelessWidget {
 
         // Para saber si el usuario actual es el ÚNICO admin (usamos lo que hay en members)
         final adminUids = adminDocs.map((d) => d.id).toList();
-        final isCurrentUserAdmin = adminUids.contains(currentUid);
-        final isOnlyAdmin = isCurrentUserAdmin && adminUids.length == 1;
 
         // Widget tile con menú según caso
         Widget tileFor(QueryDocumentSnapshot<Map<String, dynamic>> d) {
@@ -75,7 +74,11 @@ class MembersList extends StatelessWidget {
 
           return ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(role == 'admin' ? Icons.shield : Icons.person),
+            leading: Icon(
+              role == 'admin'
+                  ? Icons.sports_volleyball
+                  : Icons.sports_volleyball_outlined,
+            ),
             title: Text(isSelf ? '$username (tú)' : username),
             subtitle: Text(role),
             trailing: canShowMenu
@@ -83,41 +86,9 @@ class MembersList extends StatelessWidget {
                     tooltip: 'Acciones',
                     onSelected: (value) async {
                       try {
-                        // --- SALIR (solo self) ---
-                        if (value == 'leave') {
-                          if (isOnlyAdmin) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Eres el único admin. Designa a otro admin antes de salir.',
-                                  ),
-                                ),
-                              );
-                            }
-                            return;
-                          }
-
-                          await ListService.instance.leaveList(
-                            listId: listId,
-                            uid: currentUid,
-                            wasAdmin: role == 'admin',
-                          );
-
-                          if (context.mounted) {
-                            Navigator.pop(context); // sales del detalle
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Has salido del grupo'),
-                              ),
-                            );
-                          }
-                          return;
-                        }
-
                         // --- DEGRADAR ADMIN (solo admin sobre otros admins) ---
                         if (value == 'demote_admin') {
-                          // opcional: impedir dejar la lista sin admins
+                          // seguro: impedir dejar la lista sin admins
                           if (role == 'admin' && adminUids.length == 1) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -241,6 +212,16 @@ class MembersList extends StatelessWidget {
                     },
                   )
                 : null,
+            onTap: isSelf
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserProfileScreen(uid: memberUid),
+                      ),
+                    );
+                  },
           );
         }
 
