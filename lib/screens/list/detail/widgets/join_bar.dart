@@ -10,9 +10,10 @@ class JoinBar extends StatelessWidget {
 
   final bool isMember;
   final bool isOnlyAdmin;
-  final bool wasAdmin; // el rol del usuario actual en ESTA lista (isAdmin)
+  final bool isOnlyMember; // NEW
+  final bool wasAdmin;
 
-  final String joinPolicy; // 'open' | 'approval'
+  final String joinPolicy;
   final Stream<DocumentSnapshot<Map<String, dynamic>>>? inviteDocStream;
   final Stream<DocumentSnapshot<Map<String, dynamic>>>? requestDocStream;
 
@@ -23,6 +24,7 @@ class JoinBar extends StatelessWidget {
     required this.uid,
     required this.isMember,
     required this.isOnlyAdmin,
+    required this.isOnlyMember, // NEW
     required this.wasAdmin,
     required this.joinPolicy,
     required this.inviteDocStream,
@@ -41,6 +43,7 @@ class JoinBar extends StatelessWidget {
                 listId: listId,
                 uid: uid,
                 isOnlyAdmin: isOnlyAdmin,
+                isOnlyMember: isOnlyMember, // NEW
                 wasAdmin: wasAdmin,
               )
             : _JoinArea(
@@ -59,12 +62,14 @@ class _LeaveButton extends StatelessWidget {
   final String listId;
   final String uid;
   final bool isOnlyAdmin;
+  final bool isOnlyMember; // NEW
   final bool wasAdmin;
 
   const _LeaveButton({
     required this.listId,
     required this.uid,
     required this.isOnlyAdmin,
+    required this.isOnlyMember, // NEW
     required this.wasAdmin,
   });
 
@@ -78,6 +83,48 @@ class _LeaveButton extends StatelessWidget {
         foregroundColor: Theme.of(context).colorScheme.onError,
       ),
       onPressed: () async {
+        // ✅ Caso especial: eres el único miembro -> borrar lista
+        if (isOnlyMember) {
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Borrar lista'),
+              content: const Text(
+                'Eres el único miembro. Si sales, la lista se borrará. ¿Continuar?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Borrar'),
+                ),
+              ],
+            ),
+          );
+
+          if (ok != true) return;
+
+          try {
+            await ListService.instance.deleteGroupViaBackend(listId: listId);
+
+            if (!context.mounted) return;
+            Navigator.pop(context);
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Lista borrada ✅')));
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
+          return;
+        }
+
+        // Regla existente: impedir que el único admin se vaya (cuando hay más miembros)
         if (isOnlyAdmin) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

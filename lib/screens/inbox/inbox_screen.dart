@@ -63,47 +63,68 @@ class InboxScreen extends StatelessWidget {
                   ? '—'
                   : '${two(startAt.toLocal().day)}/${two(startAt.toLocal().month)}/${startAt.toLocal().year}';
 
-              return Card(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () {
-                    final placeholder = SixinList(
-                      id: listId,
-                      title: '$place • $timeText',
-                      ownerName: '—',
-                      isPublic: false,
-                      items: const [],
-                    );
+              return FutureBuilder<bool>(
+                future: _listExists(listId),
+                builder: (context, existsSnap) {
+                  if (!existsSnap.hasData) {
+                    return const SizedBox.shrink();
+                  }
 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ListDetailScreen(list: placeholder, isGuest: false),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: ListTile(
-                      title: Text(place),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          if (startAt != null)
-                            Text(
-                              '$dateText • $timeText',
-                              style: Theme.of(context).textTheme.bodySmall,
+                  final exists = existsSnap.data!;
+
+                  if (!exists) {
+                    d.reference.delete().catchError((_) {});
+                    return const SizedBox.shrink();
+                  }
+
+                  return Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () {
+                        final placeholder = SixinList(
+                          id: listId,
+                          title: '$place • $timeText',
+                          ownerName: '—',
+                          isPublic: false,
+                          items: const [],
+                        );
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ListDetailScreen(
+                              list: placeholder,
+                              isGuest: false,
                             ),
-                          const SizedBox(height: 4),
-                          Text('Invitado por $fromUsername'),
-                        ],
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: ListTile(
+                          title: Text(place),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              if (startAt != null)
+                                Text(
+                                  '$dateText • $timeText',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              const SizedBox(height: 4),
+                              Text('Invitado por $fromUsername'),
+                            ],
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                          ),
+                        ),
                       ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     ),
-                  ),
-                ),
+                  );
+                },
               );
             },
           );
@@ -111,4 +132,12 @@ class InboxScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<bool> _listExists(String listId) async {
+  final snap = await FirebaseFirestore.instance
+      .collection('lists')
+      .doc(listId)
+      .get();
+  return snap.exists;
 }

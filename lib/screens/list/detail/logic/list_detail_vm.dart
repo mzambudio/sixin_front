@@ -13,6 +13,7 @@ class ListDetailVM {
   final bool isAdmin;
   final bool isOnlyAdmin;
   final bool isMember;
+  final bool isOnlyMember;
   final bool canSeeRequests;
 
   final Stream<DocumentSnapshot<Map<String, dynamic>>>? requestDocStream;
@@ -28,6 +29,7 @@ class ListDetailVM {
     required this.isAdmin,
     required this.isOnlyAdmin,
     required this.isMember,
+    required this.isOnlyMember,
     required this.canSeeRequests,
     required this.requestDocStream,
     required this.inviteDocStream,
@@ -66,6 +68,7 @@ class ListDetailVM {
     final isAdmin = uid.isNotEmpty && admins.contains(uid);
     final isOnlyAdmin = isAdmin && admins.length == 1;
     final isMember = uid.isNotEmpty && memberUids.contains(uid);
+    final isOnlyMember = isMember && memberUids.length == 1;
     final canSeeRequests = !isGuest && isAdmin && joinPolicy == 'approval';
 
     final requestDocStream =
@@ -97,6 +100,7 @@ class ListDetailVM {
       isAdmin: isAdmin,
       isOnlyAdmin: isOnlyAdmin,
       isMember: isMember,
+      isOnlyMember: isOnlyMember,
       canSeeRequests: canSeeRequests,
       requestDocStream: requestDocStream,
       inviteDocStream: inviteDocStream,

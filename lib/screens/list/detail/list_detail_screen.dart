@@ -101,6 +101,7 @@ class ListDetailScreen extends StatelessWidget {
                   isGuest: isGuest,
                   uid: vm.uid,
                   isMember: vm.isMember,
+                  isOnlyMember: vm.isOnlyMember,
                   isOnlyAdmin: vm.isOnlyAdmin,
                   wasAdmin: vm.isAdmin,
                   joinPolicy: vm.joinPolicy,
