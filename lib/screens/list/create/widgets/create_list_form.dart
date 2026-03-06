@@ -62,7 +62,7 @@ class CreateListForm extends StatelessWidget {
         children: [
           // Lugar
           DropdownButtonFormField<String>(
-            value: selectedPlace,
+            initialValue: selectedPlace,
             decoration: const InputDecoration(
               labelText: 'Lugar',
               border: OutlineInputBorder(),

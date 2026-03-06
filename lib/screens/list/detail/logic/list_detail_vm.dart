@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:sixin_front/core/constants/list_form_constants.dart';
 
 class ListDetailVM {
   final String listId;
@@ -19,6 +20,16 @@ class ListDetailVM {
   final Stream<DocumentSnapshot<Map<String, dynamic>>>? requestDocStream;
   final Stream<DocumentSnapshot<Map<String, dynamic>>>? inviteDocStream;
 
+  // Nuevos campos para la UI
+  final String placeLabel;
+  final String? dateLabel;
+  final String? timeLabel;
+  final String? dateTimeLabel;
+  final String? totalPriceLabel;
+  final List<String> levels;
+  final List<String> systems;
+  final String? description;
+
   ListDetailVM._({
     required this.listId,
     required this.appTitle,
@@ -33,6 +44,14 @@ class ListDetailVM {
     required this.canSeeRequests,
     required this.requestDocStream,
     required this.inviteDocStream,
+    required this.placeLabel,
+    required this.dateLabel,
+    required this.timeLabel,
+    required this.dateTimeLabel,
+    required this.totalPriceLabel,
+    required this.levels,
+    required this.systems,
+    required this.description,
   });
 
   factory ListDetailVM.fromDoc({
@@ -41,7 +60,9 @@ class ListDetailVM {
     required Map<String, dynamic> data,
     required bool isGuest,
   }) {
-    final place = (data['place'] ?? '').toString();
+    final place = (data['place'] ?? '').toString().trim();
+    final customPlace = (data['customPlace'] ?? '').toString().trim();
+
     final startAtRaw = data['startAt'];
     final startAt = startAtRaw is Timestamp ? startAtRaw.toDate() : null;
 
@@ -90,6 +111,37 @@ class ListDetailVM {
               .doc(listId)
               .snapshots();
 
+    // ---- nuevos datos derivados ----
+    final placeLabel = _buildPlaceLabel(place: place, customPlace: customPlace);
+
+    final localStartAt = startAt?.toLocal();
+    final dateLabel = localStartAt == null ? null : _formatDate(localStartAt);
+    final timeLabel = localStartAt == null ? null : _formatTime(localStartAt);
+    final dateTimeLabel = localStartAt == null
+        ? null
+        : '${_formatDate(localStartAt)} • ${_formatTime(localStartAt)}';
+
+    final totalPriceLabel = _buildPriceLabel(data['totalPrice']);
+
+    final levelsRaw = data['levels'];
+    final levels = levelsRaw is List
+        ? levelsRaw
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList()
+        : <String>[];
+
+    final systemsRaw = data['systems'];
+    final systems = systemsRaw is List
+        ? systemsRaw
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList()
+        : <String>[];
+
+    final descriptionRaw = (data['description'] ?? '').toString().trim();
+    final description = descriptionRaw.isEmpty ? null : descriptionRaw;
+
     return ListDetailVM._(
       listId: listId,
       appTitle: appTitle,
@@ -104,8 +156,45 @@ class ListDetailVM {
       canSeeRequests: canSeeRequests,
       requestDocStream: requestDocStream,
       inviteDocStream: inviteDocStream,
+      placeLabel: placeLabel,
+      dateLabel: dateLabel,
+      timeLabel: timeLabel,
+      dateTimeLabel: dateTimeLabel,
+      totalPriceLabel: totalPriceLabel,
+      levels: levels,
+      systems: systems,
+      description: description,
     );
   }
+
+  static String _buildPlaceLabel({
+    required String place,
+    required String customPlace,
+  }) {
+    if (place.isEmpty) return 'Sin lugar';
+
+    if (place == kCustomPlaceValue) {
+      return customPlace.isNotEmpty ? customPlace : 'Lugar personalizado';
+    }
+
+    return place;
+  }
+
+  static String? _buildPriceLabel(dynamic raw) {
+    if (raw == null) return null;
+
+    if (raw is num) {
+      return '${raw.toStringAsFixed(2)} €';
+    }
+
+    final text = raw.toString().trim();
+    if (text.isEmpty) return null;
+
+    return '$text €';
+  }
+
+  static String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   static String _formatTime(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

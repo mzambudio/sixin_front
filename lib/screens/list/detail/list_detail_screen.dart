@@ -78,6 +78,8 @@ class ListDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              ListInfoCard(vm: vm),
+              const SizedBox(height: 16),
               Text('Miembros', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               MembersList(
