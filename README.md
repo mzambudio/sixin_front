@@ -46,17 +46,10 @@ La aplicación está orientada principalmente a jugadores de voleibol aficionado
 
 ## Tecnologías utilizadas
 
-### Frontend
-- Flutter
-
-### Infraestructura y servicios
-- Firebase
-
-### Backend relacionado
-- Next.js API Routes
-
-### Futuro
-- Vercel
+- **Frontend:** Flutter
+- **Infraestructura y servicios:** Firebase
+- **Backend relacionado:** Next.js API Routes
+- **Futuro:** Vercel
 
 ## Estado del proyecto
 
@@ -86,7 +79,7 @@ Para trabajar con este proyecto se recomienda tener instalado:
 
 - Flutter SDK
 - Dart SDK
-- Un emulador Android o dispositivo físico
+- Un emulador Android o un dispositivo físico
 - Visual Studio Code o Android Studio
 
 ### Instalación
@@ -141,6 +134,9 @@ sixin_front/
 
 - [Arquitectura del frontend](docs/architecture.md)
 - [Servicios principales](docs/services.md)
+- [Modelo de datos en Firestore](docs/firestore.md)
+- [Flujos principales](docs/flows.md)
+- [Pantallas del frontend](docs/screens.md)
 
 ## Visión de futuro
 
