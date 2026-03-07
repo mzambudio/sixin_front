@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'logic/auth_validators.dart';
 import 'reset_password_screen.dart';
+import 'widgets/auth_email_field.dart';
+import 'widgets/auth_submit_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -13,12 +16,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
 
-  String? _validateEmail(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
-    final re = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-    return re.hasMatch(v) ? null : 'Correo inválido';
-  }
-
   void _send() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -28,7 +25,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
 
-      final code = "123456";
+      const code = '123456';
 
       Navigator.pushNamed(
         context,
@@ -50,7 +47,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Recuperar contraseña")),
+      appBar: AppBar(title: const Text('Recuperar contraseña')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Form(
@@ -58,29 +55,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(
             children: [
               const Text(
-                "Ingresa tu correo y te enviaremos un código de recuperación (demo local).",
+                'Ingresa tu correo y te enviaremos un código de recuperación (demo local).',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              TextFormField(
-                keyboardType: TextInputType.emailAddress,
+              AuthEmailField(
                 controller: _emailCtrl,
-                validator: _validateEmail,
-                decoration: const InputDecoration(
-                  labelText: "Correo",
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
+                validator: AuthValidators.email,
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _send,
-                  child: _loading
-                      ? const CircularProgressIndicator(strokeWidth: 2)
-                      : const Text("Enviar código (demo)"),
-                ),
-              )
+              AuthSubmitButton(
+                text: 'Enviar código (demo)',
+                loading: _loading,
+                onPressed: _send,
+              ),
             ],
           ),
         ),
