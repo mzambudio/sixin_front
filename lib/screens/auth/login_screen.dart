@@ -185,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderSide: BorderSide(
-                              color: hintColor.withOpacity(0.28),
+                              color: hintColor.withValues(alpha: 0.28),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -223,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderSide: BorderSide(
-                              color: hintColor.withOpacity(0.28),
+                              color: hintColor.withValues(alpha: 0.28),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -305,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
-                              color: hintColor.withOpacity(0.22),
+                              color: hintColor.withValues(alpha: 0.22),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             foregroundColor: textColor,

@@ -108,6 +108,9 @@ class _CreateListScreenState extends State<CreateListScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _saving = true);
 
     try {
@@ -118,6 +121,7 @@ class _CreateListScreenState extends State<CreateListScreen> {
       if (sp == null) {
         throw Exception('Selecciona un lugar');
       }
+
       final place = sp == kCustomPlaceValue
           ? _normalizePlace(_customPlaceCtrl.text)
           : sp;
@@ -155,20 +159,20 @@ class _CreateListScreenState extends State<CreateListScreen> {
 
       if (code != null) {
         await showAccessCodeDialog(context, code);
+        if (!mounted) return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Lista creada ✅')));
+      messenger.showSnackBar(const SnackBar(content: Text('Lista creada ✅')));
 
-      Navigator.pop(context);
+      navigator.pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
