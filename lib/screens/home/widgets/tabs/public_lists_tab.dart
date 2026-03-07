@@ -73,14 +73,21 @@ class PublicListsTab extends StatelessWidget {
                 title: Text(list.title),
                 subtitle: Text(subtitleText),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
+                onTap: () async {
+                  final result = await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) =>
                           ListDetailScreen(list: list, isGuest: isGuest),
                     ),
                   );
+
+                  if (!context.mounted) return;
+
+                  if (result is String && result.isNotEmpty) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(result)));
+                  }
                 },
               ),
             );

@@ -51,7 +51,7 @@ class MyListsTab extends StatelessWidget {
             final createdBy = (data['createdBy'] ?? '') as String;
             final isOwner = createdBy == uid;
 
-            final title = buildListTitleShort(data); // ✅ lugar + hora
+            final title = buildListTitleShort(data);
             final owner = (data['ownerUsername'] ?? '—') as String;
 
             final list = SixinList(
@@ -71,14 +71,21 @@ class MyListsTab extends StatelessWidget {
                 title: Text(list.title),
                 subtitle: Text(subtitleText),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.push(
-                    context,
+                onTap: () async {
+                  final result = await Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) =>
                           ListDetailScreen(list: list, isGuest: false),
                     ),
                   );
+
+                  if (!context.mounted) return;
+
+                  if (result is String && result.isNotEmpty) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(result)));
+                  }
                 },
               ),
             );

@@ -60,6 +60,7 @@ Actualmente Sixin ya permite la creación y gestión de listas para partidos de 
 ## Roadmap
 
 - Opción para borrar la cuenta
+- Reset de contraseña funcional
 - Seguimiento de pagos entre miembros
 - Sistema de amigos
 - Mejoras en el perfil para mostrar experiencia

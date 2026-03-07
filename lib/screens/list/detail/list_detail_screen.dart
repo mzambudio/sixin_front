@@ -27,7 +27,25 @@ class ListDetailScreen extends StatelessWidget {
         if (snap.hasError) {
           return _stateScaffold(
             title: list.title,
-            body: Center(child: Text('Error: ${snap.error}')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Esta lista ya no está disponible.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: const Text('Volver'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
@@ -44,7 +62,25 @@ class ListDetailScreen extends StatelessWidget {
         if (!doc.exists || data == null) {
           return _stateScaffold(
             title: list.title,
-            body: const Center(child: Text('La lista no existe')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'La lista ya no existe.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: const Text('Volver'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
