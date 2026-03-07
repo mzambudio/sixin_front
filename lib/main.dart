@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sixin_front/app/root/auth_gate.dart';
 import 'core/theme/theme_controller.dart';
 import 'screens/screens.dart';
 import 'package:firebase_core/firebase_core.dart';

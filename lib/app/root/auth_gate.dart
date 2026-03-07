@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sixin_front/core/settings/settings_controller.dart';
-import '../auth/login_screen.dart';
-import '../home/home_screen.dart';
+import '../../screens/auth/login_screen.dart';
+import '../../screens/home/home_screen.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
