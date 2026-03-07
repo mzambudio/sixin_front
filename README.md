@@ -49,7 +49,7 @@ La aplicación está orientada principalmente a jugadores de voleibol aficionado
 - **Frontend:** Flutter
 - **Infraestructura y servicios:** Firebase
 - **Backend relacionado:** Next.js API Routes
-- **Futuro:** Vercel
+- **Despliegue del backend:** Vercel
 
 ## Estado del proyecto
 
@@ -66,6 +66,7 @@ Actualmente Sixin ya permite la creación y gestión de listas para partidos de 
 - Mejoras en el perfil para mostrar experiencia
 - Imágenes de perfil
 - Mejoras en despliegue backend
+- Login con Google
 - Nuevas herramientas de organización de partidos
 
 ## Instalación y ejecución
@@ -112,7 +113,7 @@ flutter run -d <device_id>
 
 ### Nota sobre el backend
 
-Algunas funcionalidades pueden depender de servicios externos o del backend de Sixin, que se desarrolla y mantiene en un repositorio separado.
+Algunas funcionalidades dependen del backend de Sixin, desplegado de forma independiente. Para que esas funciones operen correctamente, el frontend debe apuntar a una URL válida del backend.
 
 ## Estructura resumida del proyecto
 
