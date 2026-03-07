@@ -11,6 +11,7 @@ class ListService {
 
   final _db = FirebaseFirestore.instance;
 
+  /// Devuelve un stream con las listas públicas ordenadas por fecha de inicio.
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPublicLists() {
     return _db
         .collection('lists')
@@ -19,6 +20,9 @@ class ListService {
         .snapshots();
   }
 
+  /// Devuelve un stream con las listas en las que participa el usuario.
+  ///
+  /// Se apoya en `memberUids` para evitar joins o lecturas adicionales.
   Stream<QuerySnapshot<Map<String, dynamic>>> watchMyLists(String uid) {
     return _db
         .collection('lists')
@@ -27,38 +31,52 @@ class ListService {
         .snapshots();
   }
 
-  // ─────────────────────────────────────────────
-  // CREATE LIST (+ optional private join code)
-  // ─────────────────────────────────────────────
+  /// Genera un código legible para listas privadas.
+  ///
+  /// Se excluyen caracteres ambiguos como I, O, 1 y 0 para reducir errores
+  /// al compartirlo o introducirlo manualmente.
   String _generateJoinCode({int groups = 3, int groupLen = 4}) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin I/O/1/0
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rnd = Random.secure();
 
     String group() =>
         List.generate(groupLen, (_) => chars[rnd.nextInt(chars.length)]).join();
-    return List.generate(groups, (_) => group()).join('-'); // ABCD-EF3K-9ZQ2
+
+    return List.generate(groups, (_) => group()).join('-');
   }
 
+  /// Normaliza el código antes de validarlo o hashearlo.
+  ///
+  /// Esto permite aceptar pequeñas variaciones de entrada del usuario, como
+  /// espacios accidentales o diferencias entre mayúsculas y minúsculas.
   String _normalizeCode(String code) =>
       code.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
+  /// Genera el hash persistido del código de acceso.
+  ///
+  /// La resolución se hace por hash en `list_codes` para no depender del valor
+  /// en bruto como identificador de documento.
   String _codeHash(String normalizedCode) {
     final bytes = utf8.encode(normalizedCode);
     return sha256.convert(bytes).toString();
   }
 
-  /// Crea una lista.
-  /// Devuelve el código (solo si private), si no devuelve null.
+  /// Crea una lista y registra al creador como primer administrador.
+  ///
+  /// Si la lista es privada, también genera un código de acceso y crea su
+  /// entrada índice en `list_codes/{hash}`.
+  ///
+  /// Devuelve el código generado solo en listas privadas.
   Future<String?> createList({
     required String uid,
-    required String ownerUsername, // guárdalo para mostrarlo en Home sin joins
+    required String ownerUsername,
     required String place,
     required DateTime startAt,
     required double? totalPrice,
     required List<String> levels,
     required List<String> systems,
-    required String visibility, // "public" | "private"
-    required String joinPolicy, // "open" | "approval"
+    required String visibility,
+    required String joinPolicy,
     String? description,
   }) async {
     final listsRef = _db.collection('lists').doc();
@@ -66,9 +84,8 @@ class ListService {
 
     String? joinCode;
     String? joinCodeHash;
-
-    // Si es privada, generamos código y hash y creamos doc índice list_codes/{hash}
     DocumentReference<Map<String, dynamic>>? codeRef;
+
     if (visibility == 'private') {
       joinCode = _generateJoinCode();
       final normalized = _normalizeCode(joinCode);
@@ -77,7 +94,6 @@ class ListService {
     }
 
     final now = FieldValue.serverTimestamp();
-
     final batch = _db.batch();
 
     batch.set(listsRef, {
@@ -91,9 +107,9 @@ class ListService {
       'createdBy': uid,
       'admins': [uid],
       'ownerUsername': ownerUsername,
-      'visibility': visibility, // public/private
-      'joinPolicy': joinPolicy, // open/approval
-      'memberUids': [uid], // para "Mis listas" fácil
+      'visibility': visibility,
+      'joinPolicy': joinPolicy,
+      'memberUids': [uid],
       'createdAt': now,
       'updatedAt': now,
       if (joinCodeHash != null) 'joinCodeHash': joinCodeHash,
@@ -102,14 +118,14 @@ class ListService {
 
     batch.set(membersRef, {
       'role': 'admin',
-      'username': ownerUsername, // ✅
+      'username': ownerUsername,
       'joinedAt': now,
     });
 
     if (codeRef != null) {
       batch.set(codeRef, {
         'listId': listsRef.id,
-        'createdBy': uid, // ✅ nuevo
+        'createdBy': uid,
         'createdAt': now,
       });
     }
@@ -118,9 +134,11 @@ class ListService {
     return joinCode;
   }
 
-  // ─────────────────────────────────────────────
-  // JOIN / REQUEST JOIN
-  // ─────────────────────────────────────────────
+  /// Añade directamente al usuario a la lista si la política de acceso es abierta.
+  ///
+  /// La operación se hace en transacción para mantener sincronizados:
+  /// - `lists/{listId}.memberUids`
+  /// - `lists/{listId}/members/{uid}`
   Future<void> joinList({required String listId, required String uid}) async {
     final listRef = _db.collection('lists').doc(listId);
     final memberRef = listRef.collection('members').doc(uid);
@@ -146,7 +164,7 @@ class ListService {
 
       tx.set(memberRef, {
         'role': 'member',
-        'username': username, // ✅
+        'username': username,
         'joinedAt': FieldValue.serverTimestamp(),
       });
 
@@ -156,6 +174,9 @@ class ListService {
     });
   }
 
+  /// Crea una solicitud de acceso para listas que requieren aprobación.
+  ///
+  /// No permite solicitar acceso si el usuario ya pertenece a la lista.
   Future<void> requestJoin({
     required String listId,
     required String uid,
@@ -179,7 +200,6 @@ class ListService {
         throw Exception('Esta lista es de entrada directa.');
       }
 
-      // Si ya es miembro, no puede pedir
       if (memberUids.contains(uid)) {
         throw Exception('Ya perteneces a esta lista.');
       }
@@ -198,9 +218,10 @@ class ListService {
     });
   }
 
-  // ─────────────────────────────────────────────
-  // REJECT / APPROVE REQUEST
-  // ─────────────────────────────────────────────
+  /// Convierte una solicitud pendiente en membresía.
+  ///
+  /// Si por cualquier motivo el usuario ya era miembro, la solicitud se limpia
+  /// igualmente para dejar el estado consistente.
   Future<void> approveRequest({
     required String listId,
     required String requesterUid,
@@ -217,7 +238,6 @@ class ListService {
       final reqSnap = await tx.get(reqRef);
       if (!reqSnap.exists) throw Exception('La solicitud ya no existe');
 
-      // Evitar duplicados
       final memberSnap = await tx.get(memberRef);
       if (!memberSnap.exists) {
         final userSnap = await tx.get(userRef);
@@ -239,6 +259,7 @@ class ListService {
     });
   }
 
+  /// Rechaza una solicitud eliminando su documento.
   Future<void> rejectRequest({
     required String listId,
     required String requesterUid,
@@ -252,6 +273,7 @@ class ListService {
     await reqRef.delete();
   }
 
+  /// Permite al propio usuario retirar su solicitud pendiente.
   Future<void> cancelJoinRequest({
     required String listId,
     required String uid,
@@ -264,6 +286,10 @@ class ListService {
         .delete();
   }
 
+  /// Elimina a un usuario de la lista.
+  ///
+  /// Si el usuario era administrador, también lo elimina de `admins`.
+  /// Nunca permite expulsar al último administrador.
   Future<void> removeMember({
     required String listId,
     required String targetUid,
@@ -285,7 +311,6 @@ class ListService {
 
       final isTargetAdmin = admins.contains(targetUid);
 
-      // Si el objetivo es admin, no dejes la lista sin admins
       if (isTargetAdmin && admins.length <= 1) {
         throw Exception('No puedes expulsar al último administrador.');
       }
@@ -301,12 +326,10 @@ class ListService {
         tx.delete(reqRef);
       }
 
-      // Updates del doc principal
       final updates = <String, dynamic>{
         'memberUids': FieldValue.arrayRemove([targetUid]),
       };
 
-      // Quitar de admins si era admin
       if (isTargetAdmin) {
         updates['admins'] = FieldValue.arrayRemove([targetUid]);
       }
@@ -315,6 +338,7 @@ class ListService {
     });
   }
 
+  /// Promociona a un miembro existente a administrador.
   Future<void> makeAdmin({
     required String listId,
     required String targetUid,
@@ -336,6 +360,9 @@ class ListService {
     });
   }
 
+  /// Revierte a un administrador al rol normal de miembro.
+  ///
+  /// La lista siempre debe conservar al menos un administrador.
   Future<void> demoteAdmin({
     required String listId,
     required String targetUid,
@@ -357,7 +384,6 @@ class ListService {
         return;
       }
 
-      // No dejes la lista sin admins
       if (admins.length <= 1) {
         throw Exception('Debe quedar al menos un administrador.');
       }
@@ -372,6 +398,10 @@ class ListService {
     });
   }
 
+  /// Permite al usuario salir de una lista.
+  ///
+  /// Si el usuario es el último administrador, la salida se bloquea hasta que
+  /// designe a otro admin.
   Future<void> leaveList({
     required String listId,
     required String uid,
@@ -390,7 +420,6 @@ class ListService {
           ? adminsRaw.map((e) => e.toString()).toList()
           : <String>[];
 
-      // Si era admin y es el último admin, no puede salir
       if (wasAdmin && admins.where((a) => a == uid).isNotEmpty) {
         if (admins.length <= 1) {
           throw Exception(
@@ -418,15 +447,20 @@ class ListService {
     });
   }
 
+  /// URL base del backend usada desde el emulador Android.
+  ///
+  /// `10.0.2.2` apunta al host local de la máquina desde el emulador.
   static const String _baseUrl = 'http://10.0.2.2:3000';
 
+  /// Solicita al backend la eliminación completa de una lista.
+  ///
+  /// Esta operación se delega al servidor porque puede implicar borrar varias
+  /// colecciones o aplicar comprobaciones que no conviene dejar solo en cliente.
   Future<void> deleteGroupViaBackend({required String listId}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('No hay sesión activa');
 
-    // Si a veces te da 401 por token viejo, usa getIdToken(true)
     final token = await user.getIdToken();
-
     final uri = Uri.parse('$_baseUrl/api/lists/$listId');
 
     final resp = await http.delete(
@@ -447,6 +481,10 @@ class ListService {
     }
   }
 
+  /// Crea una invitación pendiente resolviendo al destinatario por username.
+  ///
+  /// La invitación se almacena en el buzón del receptor:
+  /// `users/{toUid}/invites/{listId}`.
   Future<void> inviteByUsername({
     required String listId,
     required String usernameInput,
@@ -459,7 +497,6 @@ class ListService {
 
     final unameLower = trimmed.toLowerCase();
 
-    // 1) resolver uid por username
     final unameSnap = await _db.collection('usernames').doc(unameLower).get();
     if (!unameSnap.exists) throw Exception('Ese username no existe');
 
@@ -467,7 +504,6 @@ class ListService {
     if (toUid.isEmpty) throw Exception('Username inválido');
     if (toUid == from.uid) throw Exception('No puedes invitarte a ti mismo');
 
-    // 2) cargar lista y comprobar admin
     final listRef = _db.collection('lists').doc(listId);
     final listSnap = await listRef.get();
     if (!listSnap.exists) throw Exception('La lista no existe');
@@ -477,34 +513,33 @@ class ListService {
     final admins = adminsRaw is List
         ? adminsRaw.map((e) => e.toString()).toList()
         : <String>[];
+
     if (!admins.contains(from.uid)) {
       throw Exception('Solo un admin puede invitar');
     }
 
-    // 3) si ya es miembro, no invites
     final memberUidsRaw = data['memberUids'];
     final memberUids = memberUidsRaw is List
         ? memberUidsRaw.map((e) => e.toString()).toList()
         : <String>[];
+
     if (memberUids.contains(toUid)) {
       throw Exception('Ese usuario ya está en la lista');
     }
 
-    // 4) username del que invita (opcional, para mostrar en inbox)
     final fromUserSnap = await _db.collection('users').doc(from.uid).get();
     final fromUsername = (fromUserSnap.data()?['username'] ?? '').toString();
 
     final place = (data['place'] ?? '(sin lugar)').toString();
-
     final startAtRaw = data['startAt'];
     final Timestamp? startAt = startAtRaw is Timestamp ? startAtRaw : null;
 
-    // 5) crear invite en inbox del receptor (docId = listId)
     final inviteRef = _db
         .collection('users')
         .doc(toUid)
         .collection('invites')
         .doc(listId);
+
     await inviteRef.set({
       'listId': listId,
       'listPlace': place,
@@ -517,6 +552,10 @@ class ListService {
     }, SetOptions(merge: true));
   }
 
+  /// Valida un código de acceso y devuelve el `listId` asociado.
+  ///
+  /// Si el código es correcto, crea `preview_access/{uid}` para que el usuario
+  /// pueda ver una lista privada sin haber entrado todavía como miembro.
   Future<String> previewListByCode({required String rawCode}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw Exception('No hay sesión');
@@ -525,15 +564,13 @@ class ListService {
     if (normalized.isEmpty) throw Exception('Código vacío');
 
     final hash = _codeHash(normalized);
-
-    // 1) resolver listId desde list_codes/{hash}
     final codeSnap = await _db.collection('list_codes').doc(hash).get();
+
     if (!codeSnap.exists) throw Exception('Código inválido');
 
     final listId = (codeSnap.data()?['listId'] ?? '').toString();
     if (listId.isEmpty) throw Exception('Código inválido');
 
-    // 2) crear preview_access SOLO si no existe (evita update -> permission denied)
     final paRef = _db
         .collection('lists')
         .doc(listId)
@@ -551,6 +588,10 @@ class ListService {
     return listId;
   }
 
+  /// Acepta una invitación pendiente y convierte al usuario en miembro.
+  ///
+  /// Si el usuario ya era miembro, la invitación se elimina igualmente para
+  /// evitar estados residuales en el buzón.
   Future<void> acceptInvite({
     required String listId,
     required String uid,
@@ -573,7 +614,6 @@ class ListService {
       final listSnap = await tx.get(listRef);
       if (!listSnap.exists) throw Exception('La lista no existe');
 
-      // Si ya es miembro, limpia invite y listo
       final memberSnap = await tx.get(memberRef);
       if (!memberSnap.exists) {
         final userSnap = await tx.get(userRef);
@@ -594,6 +634,7 @@ class ListService {
     });
   }
 
+  /// Rechaza una invitación eliminándola del buzón del usuario.
   Future<void> rejectInvite({
     required String listId,
     required String uid,
