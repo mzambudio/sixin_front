@@ -54,9 +54,30 @@ class _HomeScreenState extends State<HomeScreen>
                     '/',
                     (route) => false,
                   );
-                } else {
-                  await AuthService.instance.signOut();
+                  return;
                 }
+
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Cerrar sesión'),
+                    content: const Text('¿Seguro que quieres cerrar sesión?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('Cerrar sesión'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm != true) return;
+
+                await AuthService.instance.signOut();
               } catch (_) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
