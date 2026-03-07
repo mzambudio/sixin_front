@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/list_creation_service.dart';
 import 'package:sixin_front/core/constants/list_form_constants.dart';
 import 'widgets/widgets.dart';
 
@@ -138,7 +138,7 @@ class _CreateListScreenState extends State<CreateListScreen> {
       final visibility = _isPrivate ? 'private' : 'public';
       final joinPolicy = _needsApproval ? 'approval' : 'open';
 
-      final code = await ListService.instance.createList(
+      final code = await ListCreationService.instance.createList(
         uid: uid,
         ownerUsername: ownerUsername,
         place: place,

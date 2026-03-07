@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/list_backend_service.dart';
 
 class SettingsMenu extends StatelessWidget {
   final String listId;
@@ -37,7 +37,9 @@ class SettingsMenu extends StatelessWidget {
         if (ok != true) return;
 
         try {
-          await ListService.instance.deleteGroupViaBackend(listId: listId);
+          await ListBackendService.instance.deleteGroupViaBackend(
+            listId: listId,
+          );
           if (!context.mounted) return;
 
           Navigator.pop(context);

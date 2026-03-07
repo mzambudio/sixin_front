@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 
 class InviteFab extends StatelessWidget {
   final String listId;
@@ -52,7 +52,9 @@ class InviteFab extends StatelessWidget {
                                 );
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Código copiado ✅')),
+                                  const SnackBar(
+                                    content: Text('Código copiado ✅'),
+                                  ),
                                 );
                               },
                       ),
@@ -82,7 +84,7 @@ class InviteFab extends StatelessWidget {
                   if (input.isEmpty) return;
 
                   try {
-                    await ListService.instance.inviteByUsername(
+                    await ListInvitationService.instance.inviteByUsername(
                       listId: listId,
                       usernameInput: input,
                     );
@@ -94,9 +96,9 @@ class InviteFab extends StatelessWidget {
                     );
                   } catch (e) {
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 },
                 child: const Text('Enviar'),

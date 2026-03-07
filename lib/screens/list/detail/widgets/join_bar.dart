@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 
 class JoinBar extends StatelessWidget {
   final String listId;
@@ -94,7 +94,9 @@ class _LeaveButton extends StatelessWidget {
           if (!ok) return;
 
           try {
-            await ListService.instance.deleteGroupViaBackend(listId: listId);
+            await ListBackendService.instance.deleteGroupViaBackend(
+              listId: listId,
+            );
             if (!context.mounted) return;
             Navigator.pop(context);
             _snack(context, 'Lista borrada ✅');
@@ -122,7 +124,7 @@ class _LeaveButton extends StatelessWidget {
         if (!ok) return;
 
         try {
-          await ListService.instance.leaveList(
+          await ListMembershipService.instance.leaveList(
             listId: listId,
             uid: uid,
             wasAdmin: wasAdmin,
@@ -171,7 +173,7 @@ class _JoinArea extends StatelessWidget {
                   label: const Text('Rechazar'),
                   onPressed: () => _runAction(
                     context,
-                    () => ListService.instance.rejectInvite(
+                    () => ListInvitationService.instance.rejectInvite(
                       listId: listId,
                       uid: uid,
                     ),
@@ -187,7 +189,7 @@ class _JoinArea extends StatelessWidget {
                   label: const Text('Aceptar invitación'),
                   onPressed: () => _runAction(
                     context,
-                    () => ListService.instance.acceptInvite(
+                    () => ListInvitationService.instance.acceptInvite(
                       listId: listId,
                       uid: uid,
                     ),
@@ -215,7 +217,7 @@ class _JoinArea extends StatelessWidget {
                   ),
                   onPressed: () => _runAction(
                     context,
-                    () => ListService.instance.cancelJoinRequest(
+                    () => ListMembershipService.instance.cancelJoinRequest(
                       listId: listId,
                       uid: uid,
                     ),
@@ -229,7 +231,7 @@ class _JoinArea extends StatelessWidget {
                 label: const Text('Solicitar unirme'),
                 onPressed: () => _runAction(
                   context,
-                  () => ListService.instance.requestJoin(
+                  () => ListMembershipService.instance.requestJoin(
                     listId: listId,
                     uid: uid,
                   ),
@@ -246,7 +248,10 @@ class _JoinArea extends StatelessWidget {
           label: const Text('Unirme'),
           onPressed: () => _runAction(
             context,
-            () => ListService.instance.joinList(listId: listId, uid: uid),
+            () => ListMembershipService.instance.joinList(
+              listId: listId,
+              uid: uid,
+            ),
             successMsg: 'Te has unido ✅',
           ),
         );

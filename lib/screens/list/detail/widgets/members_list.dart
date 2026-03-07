@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 import 'package:sixin_front/core/settings/settings_controller.dart';
 import 'package:sixin_front/screens/profile/member/user_profile_screen.dart';
 import 'widgets.dart';
@@ -139,7 +139,7 @@ class MembersList extends StatelessWidget {
                             return;
                           }
 
-                          await ListService.instance.demoteAdmin(
+                          await ListAdminService.instance.demoteAdmin(
                             listId: listId,
                             targetUid: memberUid,
                           );
@@ -156,7 +156,7 @@ class MembersList extends StatelessWidget {
 
                         // --- HACER ADMIN (solo admin sobre miembros) ---
                         if (value == 'make_admin') {
-                          await ListService.instance.makeAdmin(
+                          await ListAdminService.instance.makeAdmin(
                             listId: listId,
                             targetUid: memberUid,
                           );
@@ -195,7 +195,7 @@ class MembersList extends StatelessWidget {
 
                           if (ok != true) return;
 
-                          await ListService.instance.removeMember(
+                          await ListAdminService.instance.removeMember(
                             listId: listId,
                             targetUid: memberUid,
                           );

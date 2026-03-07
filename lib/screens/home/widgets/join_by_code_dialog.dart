@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 import 'package:sixin_front/screens/list/detail/list_detail_screen.dart';
 import 'package:sixin_front/models/models.dart';
 
@@ -36,7 +36,7 @@ Future<void> showJoinByCodeFlow(BuildContext context) async {
   if (code == null) return;
 
   try {
-    final listId = await ListService.instance.previewListByCode(rawCode: code);
+    final listId = await ListMembershipService.instance.previewListByCode(rawCode: code);
 
     if (!context.mounted) return;
 

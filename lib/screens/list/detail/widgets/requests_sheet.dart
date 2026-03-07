@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 
 class RequestsSheet extends StatelessWidget {
   final String listId;
@@ -80,7 +80,7 @@ class RequestsSheet extends StatelessWidget {
                               icon: const Icon(Icons.close),
                               onPressed: () async {
                                 try {
-                                  await ListService.instance.rejectRequest(
+                                  await ListAdminService.instance.rejectRequest(
                                     listId: listId,
                                     requesterUid: requesterUid,
                                   );
@@ -105,10 +105,11 @@ class RequestsSheet extends StatelessWidget {
                               icon: const Icon(Icons.check),
                               onPressed: () async {
                                 try {
-                                  await ListService.instance.approveRequest(
-                                    listId: listId,
-                                    requesterUid: requesterUid,
-                                  );
+                                  await ListAdminService.instance
+                                      .approveRequest(
+                                        listId: listId,
+                                        requesterUid: requesterUid,
+                                      );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:sixin_front/core/services/list_service.dart';
+import 'package:sixin_front/core/services/services.dart';
 import 'package:sixin_front/core/utils/utils.dart';
 import 'package:sixin_front/models/sixin_list.dart';
 import 'package:sixin_front/screens/list/detail/list_detail_screen.dart';
@@ -13,7 +13,7 @@ class PublicListsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: ListService.instance.watchPublicLists(),
+      stream: ListQueryService.instance.watchPublicLists(),
       builder: (context, snap) {
         if (snap.hasError) {
           return Center(child: Text('Error: ${snap.error}'));
