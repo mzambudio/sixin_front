@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sixin_front/widgets/common/sixin_logo.dart';
 import '../../widgets/common/theme_editor.dart';
 import '../screens.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -112,10 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
     ).colorScheme.onSurface.withValues(alpha: 0.7);
     final primary = Theme.of(context).colorScheme.primary;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final logoAsset = isDark
-        ? 'assets/images/sixin_white.png'
-        : 'assets/images/sixin_black.png';
 
     return Scaffold(
       backgroundColor: bg,
@@ -146,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 /// ───────────────
                 /// LOGO & TITLE
                 /// ───────────────
-                Image(image: AssetImage(logoAsset), height: 180),
+                const SixinLogo(height: 180),
                 const SizedBox(height: 26),
                 Text(
                   'Sixin',
@@ -330,7 +327,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextStyle(color: hintColor),
                           ),
                           TextButton(
-                            onPressed: () => Navigator.pushNamed(context, '/register'),
+                            onPressed: () =>
+                                Navigator.pushNamed(context, '/register'),
                             child: Text(
                               'Regístrate',
                               style: TextStyle(color: primary),

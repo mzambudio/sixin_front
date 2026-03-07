@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sixin_front/screens/home/widgets/widgets.dart';
+import 'package:sixin_front/widgets/common/sixin_logo.dart';
 import '../screens.dart';
 import '../../core/services/services.dart';
 
@@ -37,7 +38,9 @@ class _HomeScreenState extends State<HomeScreen>
     return Scaffold(
       drawer: isGuest ? null : SixinDrawer(),
       appBar: AppBar(
-        title: const Text('Sixin'),
+        title: const SixinLogo(height: 45),
+        centerTitle: true,
+
         leading: isGuest ? null : const DrawerLeadingBadge(),
         actions: [
           IconButton(

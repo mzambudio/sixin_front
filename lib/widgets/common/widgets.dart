@@ -1,2 +1,3 @@
-export 'package:sixin_front/widgets/common/theme_editor.dart';
-export 'package:sixin_front/widgets/common/invites_badge_icon.dart';
+export 'theme_editor.dart';
+export 'invites_badge_icon.dart';
+export 'sixin_logo.dart'; 
