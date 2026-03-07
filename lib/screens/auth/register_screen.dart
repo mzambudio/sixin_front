@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/services/auth_service.dart';
 import 'logic/auth_validators.dart';
 import 'widgets/auth_email_field.dart';
 import 'widgets/auth_password_field.dart';
 import 'widgets/auth_submit_button.dart';
-
-enum VolleyPos { oh, o, s, mb, l }
-
-extension VolleyPosX on VolleyPos {
-  String get code => name;
-}
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -30,17 +25,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscure = true;
   bool _loading = false;
 
-  final Set<VolleyPos> _positions = {};
-
   Future<void> _submitRegister() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_positions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona al menos una posición.')),
-      );
-      return;
-    }
 
     setState(() => _loading = true);
 
@@ -80,7 +66,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         tx.set(userRef, {
           'username': username,
           'usernameLower': usernameLower,
-          'positions': _positions.map((p) => p.code).toList(),
           'createdAt': FieldValue.serverTimestamp(),
         });
       });
@@ -191,37 +176,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelStyle: TextStyle(color: hintColor),
                     prefixIcon: Icon(Icons.person_outline, color: hintColor),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Posiciones (elige una o varias)',
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: VolleyPos.values.map((pos) {
-                    final selected = _positions.contains(pos);
-                    return FilterChip(
-                      label: Text(pos.code.toUpperCase()),
-                      selected: selected,
-                      onSelected: _loading
-                          ? null
-                          : (v) {
-                              setState(() {
-                                if (v) {
-                                  _positions.add(pos);
-                                } else {
-                                  _positions.remove(pos);
-                                }
-                              });
-                            },
-                    );
-                  }).toList(),
                 ),
                 const SizedBox(height: 22),
                 AuthSubmitButton(
