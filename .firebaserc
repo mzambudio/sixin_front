@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sixin-a822c"
-  }
+    "default": "sixin-a822c",
+    "sixin": "sixin-a822c"
+  },
+  "targets": {},
+  "etags": {}
 }

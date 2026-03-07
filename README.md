@@ -1,4 +1,4 @@
-# Sixin
+# Sixin Front
 
 ## Descripción general
 
@@ -12,14 +12,10 @@ Su objetivo es ofrecer una alternativa más estructurada y eficiente a los grupo
 
 Sixin está dividido en dos proyectos independientes, cada uno con su propio repositorio:
 
-- **sixin_front**: aplicación móvil desarrollada con Flutter
+- **sixin_front**: frontend desarrollado con Flutter
 - **sixin_back**: backend desarrollado con Next.js API Routes
 
 Este repositorio corresponde únicamente a **`sixin_front`**.
-
-El frontend se encarga de la interfaz de usuario, la navegación, la experiencia de uso y la comunicación con los servicios necesarios para la aplicación.
-
-El backend de Sixin se mantiene en un repositorio separado y centraliza la lógica de servidor que no reside exclusivamente en el cliente.
 
 ## Problema que resuelve
 
@@ -80,7 +76,7 @@ Actualmente Sixin ya permite la creación y gestión de listas para partidos de 
 
 ## Instalación y ejecución
 
-Este repositorio corresponde a **`sixin_front`**, el frontend móvil de Sixin desarrollado con Flutter.
+Este repositorio corresponde a **`sixin_front`**, el frontend de Sixin desarrollado con Flutter.
 
 Para el funcionamiento completo de la plataforma, Sixin también cuenta con un backend independiente en otro repositorio: **`sixin_back`**.
 
@@ -124,92 +120,27 @@ flutter run -d <device_id>
 
 Algunas funcionalidades pueden depender de servicios externos o del backend de Sixin, que se desarrolla y mantiene en un repositorio separado.
 
-## Estructura del proyecto
-
-A nivel general, este repositorio sigue esta organización:
+## Estructura resumida del proyecto
 
 ```text
 sixin_front/
-├── android/
 ├── assets/
-├── ios/
 ├── lib/
-│   ├── core/
-│   │   ├── constants/
-│   │   ├── services/
-│   │   ├── settings/
-│   │   ├── theme/
-│   │   └── utils/
-│   ├── models/
-│   ├── screens/
-│   │   ├── auth/
-│   │   ├── home/
-│   │   ├── inbox/
-│   │   ├── list/
-│   │   ├── options/
-│   │   ├── profile/
-│   │   └── screens.dart
-│   ├── widgets/
-│   │   └── common/
-│   ├── firebase_options.dart
-│   └── main.dart
-├── linux/
-├── macos/
 ├── test/
+├── android/
+├── ios/
 ├── web/
 ├── windows/
-├── analysis_options.yaml
-├── firebase.json
-├── firestore.indexes.json
+├── linux/
+├── macos/
 ├── pubspec.yaml
 └── README.md
 ```
 
-### Organización principal
+## Documentación adicional
 
-- **android/**, **ios/**, **linux/**, **macos/**, **web/**, **windows/**: plataformas soportadas por Flutter
-- **assets/**: recursos estáticos de la aplicación
-- **lib/**: código fuente principal del frontend
-- **test/**: pruebas del proyecto
-- **pubspec.yaml**: dependencias y configuración de Flutter
-- **firebase.json**: configuración relacionada con Firebase
-- **firestore.indexes.json**: definición de índices de Firestore
-- **analysis_options.yaml**: reglas de análisis estático del proyecto
-
-### Estructura de `lib/`
-
-#### `core/`
-Contiene elementos transversales reutilizables en distintas partes de la aplicación:
-
-- **constants/**: constantes globales
-- **services/**: servicios de acceso a datos o lógica compartida
-- **settings/**: configuración funcional de la aplicación
-- **theme/**: temas y estilos visuales
-- **utils/**: utilidades generales
-
-#### `models/`
-Incluye los modelos de datos utilizados por la aplicación.
-
-#### `screens/`
-Agrupa las distintas pantallas organizadas por dominio funcional:
-
-- **auth/**: autenticación
-- **home/**: pantalla principal
-- **inbox/**: buzón de invitaciones o notificaciones
-- **list/**: gestión y visualización de listas
-- **options/**: configuración de la aplicación
-- **profile/**: perfil propio y de otros usuarios
-- **screens.dart**: punto central de exportación o acceso a pantallas
-
-#### `widgets/`
-Contiene widgets reutilizables de la interfaz.
-
-- **common/**: widgets compartidos entre varias pantallas
-
-#### Archivos principales
-
-- **main.dart**: punto de entrada principal de la aplicación
-- **firebase_options.dart**: configuración de Firebase generada para las plataformas soportadas
+- [Arquitectura del frontend](docs/architecture.md)
+- [Servicios principales](docs/services.md)
 
 ## Visión de futuro
 
