@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // -------------------------
-    // Helpers globales
-    // -------------------------
+    // =========================================================
+    // HELPERS GLOBALES
+    // =========================================================
     function signedIn() {
       return request.auth != null;
     }
@@ -17,45 +17,45 @@ service cloud.firestore {
       return signedIn()
         && (
           request.auth.uid == listData(listId).createdBy
-          || (listData(listId).admins is list && listData(listId).admins.hasAny([request.auth.uid]))
+          || (
+            listData(listId).admins is list
+            && listData(listId).admins.hasAny([request.auth.uid])
+          )
         );
     }
 
-    // =========================
+    // =========================================================
     // USERS
-    // =========================
+    // =========================================================
     match /users/{uid} {
-      // OJO: esto deja público el perfil entero. Si solo quieres username/posiciones,
-      // mejor limita campos o mueve lo público a /public_profiles. Lo dejo como tú lo tenías.
+
+      // ---------- Documento principal del usuario ----------
       allow read: if true;
       allow create: if signedIn() && request.auth.uid == uid;
       allow update, delete: if signedIn() && request.auth.uid == uid;
-      
+
+      // ---------- Settings ----------
       match /settings/{docId} {
-        allow read, create, update, delete: if request.auth != null && request.auth.uid == uid;
+        allow read, create, update, delete: if signedIn() && request.auth.uid == uid;
       }
 
-      // Inbox de invitaciones: docId = listId
+      // ---------- Invites ----------
       match /invites/{listId} {
-        // receptor puede leer
         allow get, list: if signedIn() && request.auth.uid == uid;
 
-        // crear invite: solo admin del grupo
         allow create: if signedIn()
           && request.resource.data.listId == listId
           && request.resource.data.fromUid == request.auth.uid
           && isAdminOf(listId);
 
-        // receptor puede borrar (rechazar/limpiar)
         allow delete: if signedIn() && request.auth.uid == uid;
-
         allow update: if false;
       }
     }
 
-    // =========================
+    // =========================================================
     // USERNAMES
-    // =========================
+    // =========================================================
     match /usernames/{uname} {
       allow read: if signedIn();
 
@@ -69,18 +69,17 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // =========================
+    // =========================================================
     // LISTS
-    // =========================
+    // =========================================================
     match /lists/{listId} {
 
-      // ---- helpers locales ----
+      // ---------- Helpers locales ----------
       function listDoc() {
         return get(/databases/$(database)/documents/lists/$(listId)).data;
       }
 
       function isPublicList() {
-        // válido también en subcolecciones
         return listDoc().visibility == "public";
       }
 
@@ -88,7 +87,10 @@ service cloud.firestore {
         return signedIn()
           && (
             request.auth.uid == listDoc().createdBy
-            || (listDoc().admins is list && listDoc().admins.hasAny([request.auth.uid]))
+            || (
+              listDoc().admins is list
+              && listDoc().admins.hasAny([request.auth.uid])
+            )
           );
       }
 
@@ -113,7 +115,6 @@ service cloud.firestore {
       }
 
       function canPreviewPrivate() {
-        // quién puede ver una lista privada sin ser miembro
         return isAdmin()
           || isMember(request.auth.uid)
           || hasInvite()
@@ -121,16 +122,13 @@ service cloud.firestore {
           || hasPreviewAccess();
       }
 
-      // ---- lectura del doc de lista ----
+      // ---------- Reglas documento principal ----------
       allow get: if isPublicList() || canPreviewPrivate();
-
-      // Esto permite queries sobre /lists.
       allow list: if true;
-
-      // crear lista solo logueado
       allow create: if signedIn();
+      allow delete: if isAdmin();
 
-      // ---- updates controlados ----
+      // ---------- Helpers de update ----------
       function isSelfJoinUpdate() {
         return signedIn()
           && listDoc().joinPolicy == "open"
@@ -139,7 +137,7 @@ service cloud.firestore {
           && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
           && request.resource.data.memberUids.hasAny([request.auth.uid]);
       }
-      
+
       function isInviteJoinUpdate() {
         return signedIn()
           && hasInvite()
@@ -161,14 +159,18 @@ service cloud.firestore {
         || isSelfJoinUpdate()
         || isInviteJoinUpdate()
         || isSelfLeaveUpdate();
-      allow delete: if isAdmin();
 
-      // -------------------------
-      // MEMBERS subcollection
-      // -------------------------
+      // =====================================================
+      // LISTS / MEMBERS
+      // =====================================================
       match /members/{uid} {
-        // Pública: cualquiera
-        // Privada: admin/miembro o invite/request/preview_access
+
+        function isSelfPreferredPositionUpdate() {
+          return signedIn()
+            && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['preferredPosition']);
+        }
+
         allow get, list: if isPublicList() || canPreviewPrivate();
 
         allow create: if signedIn()
@@ -177,27 +179,16 @@ service cloud.firestore {
         allow delete: if signedIn()
           && (request.auth.uid == uid || isAdmin());
 
-        // Permitir que el propio usuario actualice SOLO su preferredPosition
-        function isSelfPreferredPositionUpdate() {
-          return signedIn()
-            && request.auth.uid == uid
-            // solo cambia preferredPosition (no role, username, etc.)
-            && request.resource.data.diff(resource.data).changedKeys()
-                 .hasOnly(['preferredPosition']);
-        }
-
         allow update: if isAdmin() || isSelfPreferredPositionUpdate();
       }
 
-      // -------------------------
-      // REQUESTS subcollection
-      // -------------------------
+      // =====================================================
+      // LISTS / REQUESTS
+      // =====================================================
       match /requests/{uid} {
-        // el solicitante ve la suya, admin ve todas
         allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
         allow list: if isAdmin();
 
-        // crear solicitud: tú mismo, y no ser ya miembro (por memberUids)
         allow create: if signedIn()
           && request.auth.uid == uid
           && !(listDoc().memberUids is list && listDoc().memberUids.hasAny([uid]));
@@ -208,14 +199,12 @@ service cloud.firestore {
         allow update: if false;
       }
 
-      // -------------------------
-      // PREVIEW ACCESS (por código)
-      // -------------------------
+      // =====================================================
+      // LISTS / PREVIEW_ACCESS
+      // =====================================================
       match /preview_access/{uid} {
-        // opcional: solo el propio usuario puede leer/borrar
         allow get, delete: if signedIn() && request.auth.uid == uid;
 
-        // crear: el usuario “sella” que ha validado un codeHash válido para esta lista
         allow create: if signedIn()
           && request.auth.uid == uid
           && request.resource.data.codeHash is string
@@ -227,24 +216,21 @@ service cloud.firestore {
       }
     }
 
-    // =========================
-    // LIST CODES
-    // =========================
+    // =========================================================
+    // LIST_CODES
+    // =========================================================
     match /list_codes/{codeHash} {
       allow read: if signedIn();
 
-      // permitir crear si el creador es el usuario autenticado
-      // (sirve incluso cuando la lista aún no existe, p.ej. en el mismo batch)
       allow create: if signedIn()
         && request.resource.data.listId is string
         && request.resource.data.createdBy == request.auth.uid;
 
-      // ✅ borrar solo si eres admin de la lista (una vez ya existe)
       allow delete: if signedIn()
         && resource.data.listId is string
         && (
-          request.auth.uid ==
-            get(/databases/$(database)/documents/lists/$(resource.data.listId)).data.createdBy
+          request.auth.uid
+            == get(/databases/$(database)/documents/lists/$(resource.data.listId)).data.createdBy
           || get(/databases/$(database)/documents/lists/$(resource.data.listId)).data.admins
             .hasAny([request.auth.uid])
         );
